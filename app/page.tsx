@@ -16,57 +16,58 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
-      <HomeGate />
-      <div className="relative isolate overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/30 via-fuchsia-500/20 to-emerald-500/20 blur-3xl" />
-          <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
-        </div>
+      <HomeGate>
+        <div className="relative isolate overflow-hidden">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/30 via-fuchsia-500/20 to-emerald-500/20 blur-3xl" />
+            <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
+          </div>
 
-        <header className="sticky top-0 z-30 border-b border-zinc-900/5 bg-zinc-50/70 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/60">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <a className="flex min-w-0 items-center gap-3" href="#">
-              <div className="rounded-2xl bg-gradient-to-tr from-indigo-500/60 via-fuchsia-500/40 to-emerald-500/40 p-[1px] shadow-sm">
-                <div className="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-950 text-zinc-50 dark:bg-white dark:text-zinc-950">
-                  <span className="text-sm font-semibold">G</span>
+          <header className="sticky top-0 z-30 border-b border-zinc-900/5 bg-zinc-50/70 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/60">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+              <a className="flex min-w-0 items-center gap-3" href="#">
+                <div className="rounded-2xl bg-gradient-to-tr from-indigo-500/60 via-fuchsia-500/40 to-emerald-500/40 p-[1px] shadow-sm">
+                  <div className="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-950 text-zinc-50 dark:bg-white dark:text-zinc-950">
+                    <span className="text-sm font-semibold">G</span>
+                  </div>
                 </div>
-              </div>
-              <div className="min-w-0 leading-tight">
-                <div className="truncate text-sm font-semibold tracking-tight">
-                  {business.name}
-                </div>
-                <div className="hidden truncate text-xs text-zinc-600 dark:text-zinc-400 sm:block">
-                  Premium services · Mobile-first experience
-                </div>
-              </div>
-            </a>
 
-            <nav className="hidden items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 sm:flex">
-              <a
-                className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                href="#services"
-              >
-                Services
+                <div className="min-w-0 leading-tight">
+                  <div className="truncate text-sm font-semibold tracking-tight">
+                    {business.name}
+                  </div>
+                  <div className="hidden truncate text-xs text-zinc-600 dark:text-zinc-400 sm:block">
+                    Premium services · Mobile-first experience
+                  </div>
+                </div>
               </a>
-              <a
-                className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                href="#features"
-              >
-                Why us
-              </a>
-              <a
-                className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                href="#testimonials"
-              >
-                Results
-              </a>
-              <a
-                className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                href="#faq"
-              >
-                FAQ
-              </a>
-            </nav>
+
+              <nav className="hidden items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 sm:flex">
+                <a
+                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
+                  href="#services"
+                >
+                  Services
+                </a>
+                <a
+                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
+                  href="#features"
+                >
+                  Why us
+                </a>
+                <a
+                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
+                  href="#testimonials"
+                >
+                  Results
+                </a>
+                <a
+                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
+                  href="#faq"
+                >
+                  FAQ
+                </a>
+              </nav>
 
             <div className="flex items-center gap-2">
               <a
@@ -513,7 +514,8 @@ export default function Home() {
             </div>
           </div>
         </footer>
-      </div>
+        </div>
+      </HomeGate>
     </div>
   );
 }
