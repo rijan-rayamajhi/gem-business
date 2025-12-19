@@ -3,6 +3,18 @@ import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 
+type BusinessStatus = "draft" | "submitted" | "pending" | "verified" | "rejected";
+
+function isBusinessStatus(value: unknown): value is BusinessStatus {
+  return (
+    value === "draft" ||
+    value === "submitted" ||
+    value === "pending" ||
+    value === "verified" ||
+    value === "rejected"
+  );
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ")
@@ -27,8 +39,21 @@ export async function GET(request: Request) {
     );
   }
 
-  const userSnap = await adminDb.collection("users").doc(uid).get();
-  const hasBusiness = Boolean(userSnap.exists && userSnap.data()?.hasBusiness);
+  const businessSnap = await adminDb.collection("business").doc(uid).get();
+  const statusRaw = businessSnap.exists ? (businessSnap.data()?.status as unknown) : null;
+  const businessStatus: BusinessStatus | null = isBusinessStatus(statusRaw)
+    ? statusRaw
+    : businessSnap.exists
+      ? "submitted"
+      : null;
 
-  return NextResponse.json({ ok: true, uid, hasBusiness }, { status: 200 });
+  const hasBusiness =
+    businessStatus === "submitted" ||
+    businessStatus === "pending" ||
+    businessStatus === "verified";
+
+  return NextResponse.json(
+    { ok: true, uid, hasBusiness, businessStatus },
+    { status: 200 }
+  );
 }

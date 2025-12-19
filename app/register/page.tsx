@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 type FormState = {
@@ -21,6 +22,25 @@ type SubmitState =
   | { status: "submitting" }
   | { status: "success"; message: string }
   | { status: "error"; message: string };
+
+type BusinessDraftResponse = {
+  ok?: boolean;
+  business?:
+    | {
+        status?: string;
+        businessName?: string;
+        businessDescription?: string;
+        businessType?: string;
+        email?: string;
+        website?: string;
+        businessRole?: string;
+        name?: string;
+        contactNo?: string;
+        whatsappNo?: string;
+        businessLogo?: unknown;
+      }
+    | null;
+};
 
 const initialForm: FormState = {
   email: "",
@@ -49,6 +69,7 @@ function isValidUrl(value: string) {
 }
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(initialForm);
   const [businessLogoFile, setBusinessLogoFile] = useState<File | null>(null);
   const [businessLogoPreviewUrl, setBusinessLogoPreviewUrl] = useState<
@@ -71,20 +92,60 @@ export default function RegisterPage() {
   }, [businessLogoFile]);
 
   const validationError = useMemo(() => {
-    if (!form.businessName.trim()) return "Please enter your business name.";
-    if (!form.businessDescription.trim())
-      return "Please enter your business description.";
-    if (!form.businessType) return "Please select your business type.";
-    if (!form.email.trim()) return "Please enter your email.";
-    if (!isValidEmail(form.email)) return "Please enter a valid email.";
+    if (form.email.trim() && !isValidEmail(form.email))
+      return "Please enter a valid email.";
     if (form.website.trim() && !isValidUrl(form.website.trim()))
       return "Please enter a valid website URL.";
-    if (!form.businessRole) return "Please select your business role.";
-    if (!form.name.trim()) return "Please enter your name.";
-    if (!form.contactNo.trim()) return "Please enter your contact number.";
-    if (!form.whatsappNo.trim()) return "Please enter your WhatsApp number.";
     return null;
   }, [form]);
+
+  useEffect(() => {
+    const token = (() => {
+      try {
+        return sessionStorage.getItem("gem_id_token");
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!token) return;
+
+    const controller = new AbortController();
+    const run = async () => {
+      try {
+        const res = await fetch("/api/register", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) return;
+
+        const data = (await res.json().catch(() => null)) as BusinessDraftResponse | null;
+        if (!data?.ok || !data.business) return;
+
+        setForm((prev) => ({
+          ...prev,
+          email: data.business?.email ?? "",
+          website: data.business?.website ?? "",
+          businessName: data.business?.businessName ?? "",
+          businessDescription: data.business?.businessDescription ?? "",
+          businessType: (data.business?.businessType ?? "") as FormState["businessType"],
+          businessRole: (data.business?.businessRole ?? "") as FormState["businessRole"],
+          name: data.business?.name ?? "",
+          contactNo: data.business?.contactNo ?? "",
+          whatsappNo: data.business?.whatsappNo ?? "",
+        }));
+      } catch {
+        // ignore
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -147,10 +208,10 @@ export default function RegisterPage() {
 
       setSubmitState({
         status: "success",
-        message: data?.message || "Registration successful.",
+        message: data?.message || "Draft saved.",
       });
-      setForm(initialForm);
-      setBusinessLogoFile(null);
+
+      router.push("/register/category");
     } catch {
       setSubmitState({
         status: "error",
@@ -267,22 +328,21 @@ export default function RegisterPage() {
 
                       <div className="grid gap-2">
                         <label
-                          className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
-                          htmlFor="businessLogo"
+                          className="relative inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
                         >
                           Choose from gallery
+                          <input
+                            id="businessLogo"
+                            name="businessLogo"
+                            type="file"
+                            accept="image/*"
+                            className="absolute h-px w-px opacity-0"
+                            onChange={(e) => {
+                              const nextFile = e.target.files?.[0] ?? null;
+                              setBusinessLogoFile(nextFile);
+                            }}
+                          />
                         </label>
-                        <input
-                          id="businessLogo"
-                          name="businessLogo"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const nextFile = e.target.files?.[0] ?? null;
-                            setBusinessLogoFile(nextFile);
-                          }}
-                        />
                         <div className="text-xs text-zinc-500 dark:text-zinc-400">
                           PNG/JPG recommended.
                         </div>
@@ -304,7 +364,6 @@ export default function RegisterPage() {
                           businessName: e.target.value,
                         }))
                       }
-                      required
                     />
                   </div>
 
@@ -325,7 +384,6 @@ export default function RegisterPage() {
                           businessDescription: e.target.value,
                         }))
                       }
-                      required
                     />
                   </div>
 
@@ -347,7 +405,6 @@ export default function RegisterPage() {
                             businessType: e.target.value as FormState["businessType"],
                           }))
                         }
-                        required
                       >
                         <option value="" disabled>
                           Select
@@ -371,7 +428,6 @@ export default function RegisterPage() {
                           setForm((prev) => ({ ...prev, email: e.target.value }))
                         }
                         autoComplete="email"
-                        required
                       />
                     </div>
                   </div>
@@ -410,7 +466,6 @@ export default function RegisterPage() {
                             businessRole: e.target.value as FormState["businessRole"],
                           }))
                         }
-                        required
                       >
                         <option value="" disabled>
                           Select
@@ -433,7 +488,6 @@ export default function RegisterPage() {
                           setForm((prev) => ({ ...prev, name: e.target.value }))
                         }
                         autoComplete="name"
-                        required
                       />
                     </div>
                   </div>
@@ -458,7 +512,6 @@ export default function RegisterPage() {
                           }))
                         }
                         autoComplete="tel"
-                        required
                       />
                     </div>
 
@@ -481,7 +534,6 @@ export default function RegisterPage() {
                           }))
                         }
                         autoComplete="tel"
-                        required
                       />
                     </div>
                   </div>
