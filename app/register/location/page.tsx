@@ -4,6 +4,18 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+type BusinessStatus = "draft" | "submitted" | "pending" | "verified" | "rejected";
+
+function asBusinessStatus(value: unknown): BusinessStatus | null {
+  return value === "draft" ||
+    value === "submitted" ||
+    value === "pending" ||
+    value === "verified" ||
+    value === "rejected"
+    ? value
+    : null;
+}
+
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
@@ -27,6 +39,7 @@ type BusinessDraftResponse = {
   ok?: boolean;
   business?:
     | {
+        status?: string;
         businessType?: string;
         businessLocations?: BusinessLocation[];
         primaryBusinessLocationId?: string;
@@ -365,6 +378,20 @@ export default function RegisterLocationPage() {
         const data = (await res.json().catch(() => null)) as BusinessDraftResponse | null;
         if (!data?.ok || !data.business) return;
 
+        const status = asBusinessStatus(data.business?.status);
+        if (status === "submitted" || status === "pending") {
+          router.replace("/register/verification");
+          return;
+        }
+        if (status === "verified") {
+          router.replace("/dashboard");
+          return;
+        }
+        if (status === "rejected") {
+          router.replace("/register/rejected");
+          return;
+        }
+
         const nextBusinessType = (data.business.businessType ?? "") as
           | "online"
           | "offline"
@@ -513,11 +540,11 @@ export default function RegisterLocationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <div className="relative isolate overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/30 via-fuchsia-500/20 to-emerald-500/20 blur-3xl" />
-          <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-zinc-950/20 via-zinc-700/10 to-zinc-200/15 blur-3xl" />
+          <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-950/0 via-zinc-700/10 to-zinc-950/0 blur-3xl" />
         </div>
 
         <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
@@ -531,7 +558,7 @@ export default function RegisterLocationPage() {
 
             return (
               <div className="mb-5">
-                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-950">
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-zinc-100">
                   {imageUrl ? (
                     <Image
                       src={imageUrl}
@@ -542,7 +569,7 @@ export default function RegisterLocationPage() {
                       unoptimized
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 via-fuchsia-500/10 to-emerald-500/15" />
+                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10" />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
@@ -560,7 +587,7 @@ export default function RegisterLocationPage() {
           <div className="grid gap-2">
             <div>
               <div className="text-lg font-semibold tracking-tight">Business location</div>
-              <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              <div className="mt-1 text-sm text-zinc-600">
                 Add one or more locations and choose a primary address.
               </div>
             </div>
@@ -572,7 +599,7 @@ export default function RegisterLocationPage() {
                   <div className="text-sm font-medium">Locations</div>
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
                     onClick={() => {
                       setLocations((prev) => {
                         const next = [...prev, createEmptyLocation()];
@@ -603,14 +630,14 @@ export default function RegisterLocationPage() {
                     return (
                       <div
                         key={loc.id}
-                        className={`relative border-b border-zinc-900/10 p-4 transition last:border-b-0 sm:p-5 dark:border-white/10 ${
+                        className={`relative border-b border-zinc-900/10 p-4 transition last:border-b-0 sm:p-5 ${
                           isPrimary ? "border-l-2 border-l-emerald-500" : ""
                         }`}
                       >
                         <div className="absolute right-4 top-4">
                           <button
                             type="button"
-                            className="grid h-9 w-9 place-items-center rounded-full border border-zinc-900/10 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 active:scale-95 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                            className="grid h-9 w-9 place-items-center rounded-full border border-zinc-900/10 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 active:scale-95"
                             aria-expanded={!isCollapsed}
                             aria-controls={`${loc.id}-fields`}
                             onClick={() => {
@@ -639,7 +666,7 @@ export default function RegisterLocationPage() {
                             <div className="text-sm font-semibold tracking-tight">
                               Location {index + 1}
                             </div>
-                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                            <div className="text-xs text-zinc-500">
                               {isPrimary ? "Primary" : "Secondary"}
                             </div>
                           </div>
@@ -650,7 +677,7 @@ export default function RegisterLocationPage() {
                               className={`inline-flex h-9 items-center justify-center rounded-xl px-3 text-xs font-semibold shadow-sm transition sm:h-10 sm:px-4 sm:text-sm ${
                                 isPrimary
                                   ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                  : "border border-zinc-900/10 bg-white text-zinc-950 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                                  : "border border-zinc-900/10 bg-white text-zinc-950 hover:bg-zinc-50"
                               }`}
                               onClick={() => {
                                 setPrimaryLocationId(loc.id);
@@ -662,7 +689,7 @@ export default function RegisterLocationPage() {
 
                             <button
                               type="button"
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:px-4 sm:text-sm dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:px-4 sm:text-sm"
                               disabled={locations.length === 1}
                               onClick={() => {
                                 setLocations((prev) => {
@@ -701,7 +728,7 @@ export default function RegisterLocationPage() {
                           <div className="grid gap-2">
                             <div className="flex items-center justify-between gap-3">
                               <div className="text-sm font-medium">Shop image</div>
-                              <label className="relative inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800">
+                              <label className="relative inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50">
                                 Upload
                                 <input
                                   type="file"
@@ -719,8 +746,8 @@ export default function RegisterLocationPage() {
                               </label>
                             </div>
 
-                            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60 dark:border-white/10 dark:bg-zinc-950/30">
-                              <div className="relative aspect-video w-full bg-zinc-100 dark:bg-zinc-950">
+                            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60">
+                              <div className="relative aspect-video w-full bg-zinc-100">
                                 {effectiveImageUrl ? (
                                   <Image
                                     src={effectiveImageUrl}
@@ -731,13 +758,13 @@ export default function RegisterLocationPage() {
                                     unoptimized
                                   />
                                 ) : (
-                                  <div className="absolute inset-0 grid place-items-center bg-gradient-to-tr from-indigo-500/15 via-fuchsia-500/10 to-emerald-500/10 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                                  <div className="absolute inset-0 grid place-items-center bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10 text-xs font-semibold text-zinc-600">
                                     16:9 shop image
                                   </div>
                                 )}
                               </div>
                             </div>
-                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                            <div className="text-xs text-zinc-500">
                               This image is saved for this specific location.
                             </div>
                           </div>
@@ -749,7 +776,7 @@ export default function RegisterLocationPage() {
                             <input
                               id={`${loc.id}-gsearch`}
                               ref={(node) => attachAutocomplete(node, loc.id)}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                               placeholder={
                                 googleMapsKey
                                   ? "Start typing an address…"
@@ -761,7 +788,7 @@ export default function RegisterLocationPage() {
                               }}
                             />
                             {googleError && (
-                              <div className="text-xs text-rose-600 dark:text-rose-300">
+                              <div className="text-xs text-rose-600">
                                 {googleError}
                               </div>
                             )}
@@ -773,7 +800,7 @@ export default function RegisterLocationPage() {
                             </label>
                             <input
                               id={`${loc.id}-address1`}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                               value={loc.addressLine1}
                               onChange={(e) => {
                                 const value = e.target.value;
@@ -794,7 +821,7 @@ export default function RegisterLocationPage() {
                             </label>
                             <input
                               id={`${loc.id}-address2`}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                               value={loc.addressLine2}
                               onChange={(e) => {
                                 const value = e.target.value;
@@ -816,7 +843,7 @@ export default function RegisterLocationPage() {
                               </label>
                               <input
                                 id={`${loc.id}-city`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                                 value={loc.city}
                                 onChange={(e) => {
                                   const value = e.target.value;
@@ -836,7 +863,7 @@ export default function RegisterLocationPage() {
                               </label>
                               <input
                                 id={`${loc.id}-state`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                                 value={loc.state}
                                 onChange={(e) => {
                                   const value = e.target.value;
@@ -857,7 +884,7 @@ export default function RegisterLocationPage() {
                               <input
                                 id={`${loc.id}-pincode`}
                                 inputMode="numeric"
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                                 value={loc.pincode}
                                 onChange={(e) => {
                                   const value = e.target.value;
@@ -877,7 +904,7 @@ export default function RegisterLocationPage() {
                               </label>
                               <input
                                 id={`${loc.id}-landmark`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                                 value={loc.landmark}
                                 onChange={(e) => {
                                   const value = e.target.value;
@@ -899,7 +926,7 @@ export default function RegisterLocationPage() {
                             <input
                               id={`${loc.id}-contactNumber`}
                               inputMode="tel"
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                               value={loc.contactNumber ?? ""}
                               onChange={(e) => {
                                 const value = e.target.value;
@@ -920,7 +947,7 @@ export default function RegisterLocationPage() {
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold tracking-tight">Business hours</div>
-                                <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                <div className="mt-1 text-xs text-zinc-500">
                                   Set opening hours for this location.
                                 </div>
                               </div>
@@ -929,8 +956,8 @@ export default function RegisterLocationPage() {
                                 type="button"
                                 className={`inline-flex h-9 items-center justify-center rounded-xl px-3 text-xs font-semibold shadow-sm transition sm:h-10 sm:px-4 sm:text-sm ${
                                   hours.enabled
-                                    ? "bg-indigo-600 text-white hover:bg-indigo-500"
-                                    : "border border-zinc-900/10 bg-white text-zinc-950 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                                    ? "bg-zinc-950 text-white hover:bg-zinc-900"
+                                    : "border border-zinc-900/10 bg-white text-zinc-950 hover:bg-zinc-50"
                                 }`}
                                 onClick={() => {
                                   const next = { ...hours, enabled: !hours.enabled };
@@ -952,7 +979,7 @@ export default function RegisterLocationPage() {
                               </label>
                               <input
                                 id={`${loc.id}-timezone`}
-                                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11 dark:border-white/10 dark:bg-zinc-900 dark:focus:border-white/20 dark:focus:bg-zinc-900"
+                                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
                                 value={hours.timezone}
                                 onChange={(e) => {
                                   const next = { ...hours, timezone: e.target.value };
@@ -973,7 +1000,7 @@ export default function RegisterLocationPage() {
                                 return (
                                   <div
                                     key={key}
-                                    className="grid gap-2 border-b border-zinc-900/10 py-3 last:border-b-0 dark:border-white/10"
+                                    className="grid gap-2 border-b border-zinc-900/10 py-3 last:border-b-0"
                                   >
                                     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                                       <div className="text-sm font-semibold">{label}</div>
@@ -982,7 +1009,7 @@ export default function RegisterLocationPage() {
                                         className={`inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-semibold shadow-sm transition sm:h-9 ${
                                           day.open
                                             ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
                                         }`}
                                         onClick={() => {
                                           const next = {
@@ -1007,10 +1034,10 @@ export default function RegisterLocationPage() {
                                     {day.open ? (
                                       <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                                         <div className="grid gap-1">
-                                          <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">From</div>
+                                          <div className="text-xs font-medium text-zinc-600">From</div>
                                           <input
                                             type="time"
-                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11 dark:border-white/10 dark:bg-zinc-950 dark:focus:border-white/20"
+                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
                                             value={day.from}
                                             onChange={(e) => {
                                               const next = {
@@ -1030,10 +1057,10 @@ export default function RegisterLocationPage() {
                                           />
                                         </div>
                                         <div className="grid gap-1">
-                                          <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">To</div>
+                                          <div className="text-xs font-medium text-zinc-600">To</div>
                                           <input
                                             type="time"
-                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11 dark:border-white/10 dark:bg-zinc-950 dark:focus:border-white/20"
+                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
                                             value={day.to}
                                             onChange={(e) => {
                                               const next = {
@@ -1045,7 +1072,9 @@ export default function RegisterLocationPage() {
                                               };
                                               setLocations((prev) =>
                                                 prev.map((item) =>
-                                                  item.id === loc.id ? { ...item, businessHours: next } : item
+                                                  item.id === loc.id
+                                                    ? { ...item, businessHours: next }
+                                                    : item
                                                 )
                                               );
                                               setSubmitState({ status: "idle" });
@@ -1054,7 +1083,7 @@ export default function RegisterLocationPage() {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="text-xs text-zinc-500 dark:text-zinc-400">Closed</div>
+                                      <div className="text-xs text-zinc-500">Closed</div>
                                     )}
                                   </div>
                                 );
@@ -1072,8 +1101,8 @@ export default function RegisterLocationPage() {
                 <div
                   className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${
                     submitState.status === "success"
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                      : "border-rose-500/20 bg-rose-500/10 text-rose-700"
                   }`}
                   role="status"
                 >
@@ -1083,7 +1112,7 @@ export default function RegisterLocationPage() {
 
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={submitState.status === "submitting"}
               >
                 {submitState.status === "submitting" ? "Saving…" : "Continue"}

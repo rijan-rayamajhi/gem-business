@@ -15,171 +15,63 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <HomeGate>
         <div className="relative isolate overflow-hidden">
           <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/30 via-fuchsia-500/20 to-emerald-500/20 blur-3xl" />
-            <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
+            <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-zinc-950/20 via-zinc-700/10 to-zinc-200/15 blur-3xl" />
+            <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-950/0 via-zinc-700/10 to-zinc-950/0 blur-3xl" />
           </div>
 
-          <header className="sticky top-0 z-30 border-b border-zinc-900/5 bg-zinc-50/70 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/60">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-              <a className="flex min-w-0 items-center gap-3" href="#">
-                <div className="rounded-2xl bg-gradient-to-tr from-indigo-500/60 via-fuchsia-500/40 to-emerald-500/40 p-[1px] shadow-sm">
-                  <div className="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-950 text-zinc-50 dark:bg-white dark:text-zinc-950">
-                    <span className="text-sm font-semibold">G</span>
+          <main>
+            <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-20">
+              <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-zinc-900/10 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Available for new projects
                   </div>
-                </div>
 
-                <div className="min-w-0 leading-tight">
-                  <div className="truncate text-sm font-semibold tracking-tight">
-                    {business.name}
-                  </div>
-                  <div className="hidden truncate text-xs text-zinc-600 dark:text-zinc-400 sm:block">
-                    Premium services · Mobile-first experience
-                  </div>
-                </div>
-              </a>
+                  <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-5xl">
+                    {business.headline}
+                  </h1>
+                  <p className="max-w-xl text-pretty text-base leading-7 text-zinc-600 sm:text-lg sm:leading-8">
+                    {business.subheadline}
+                  </p>
 
-              <nav className="hidden items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 sm:flex">
-                <a
-                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                  href="#services"
-                >
-                  Services
-                </a>
-                <a
-                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                  href="#features"
-                >
-                  Why us
-                </a>
-                <a
-                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                  href="#testimonials"
-                >
-                  Results
-                </a>
-                <a
-                  className="rounded-xl px-3 py-2 transition hover:bg-zinc-900/5 hover:text-zinc-950 dark:hover:bg-white/10 dark:hover:text-zinc-50"
-                  href="#faq"
-                >
-                  FAQ
-                </a>
-              </nav>
-
-            <div className="flex items-center gap-2">
-              <a
-                className="hidden h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-medium text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800 sm:inline-flex"
-                href={`tel:${business.phone}`}
-              >
-                Call
-              </a>
-
-              <AppOnly>
-                <a
-                  className="hidden h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 sm:inline-flex"
-                  href={business.primaryCta.href}
-                >
-                  {business.primaryCta.label}
-                </a>
-              </AppOnly>
-
-              <details className="relative sm:hidden">
-                <summary className="inline-flex h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-zinc-900/10 bg-white px-3 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800">
-                  <span className="text-base leading-none">≡</span>
-                  <span>Menu</span>
-                </summary>
-                <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-zinc-900/10 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900">
-                  <div className="flex flex-col p-2 text-sm">
-                    <a className="rounded-xl px-3 py-2 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800" href="#services">
-                      Services
-                    </a>
-                    <a className="rounded-xl px-3 py-2 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800" href="#features">
-                      Why us
-                    </a>
-                    <a
-                      className="rounded-xl px-3 py-2 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                      href="#testimonials"
-                    >
-                      Results
-                    </a>
-                    <a className="rounded-xl px-3 py-2 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800" href="#faq">
-                      FAQ
-                    </a>
-                    <div className="mt-1 grid gap-2 p-2">
-                      <AppOnly>
-                        <a
-                          className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-                          href={business.primaryCta.href}
-                        >
-                          {business.primaryCta.label}
-                        </a>
-                      </AppOnly>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <AppOnly>
                       <a
-                        className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-                        href={`tel:${business.phone}`}
+                        className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900"
+                        href={business.primaryCta.href}
                       >
-                        Call
+                        {business.primaryCta.label}
                       </a>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            </div>
-          </div>
-        </header>
-
-        <main>
-          <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-20">
-            <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
-              <div className="space-y-6">
-                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-900/10 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Available for new projects
-                </div>
-
-                <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-5xl">
-                  {business.headline}
-                </h1>
-                <p className="max-w-xl text-pretty text-base leading-7 text-zinc-600 dark:text-zinc-300 sm:text-lg sm:leading-8">
-                  {business.subheadline}
-                </p>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <AppOnly>
+                    </AppOnly>
                     <a
-                      className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-                      href={business.primaryCta.href}
+                      className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-6 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
+                      href={business.secondaryCta.href}
                     >
-                      {business.primaryCta.label}
+                      {business.secondaryCta.label}
                     </a>
-                  </AppOnly>
-                  <a
-                    className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-6 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-                    href={business.secondaryCta.href}
-                  >
-                    {business.secondaryCta.label}
-                  </a>
-                </div>
+                  </div>
 
                 <div className="grid grid-cols-3 gap-3 pt-4">
-                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm">
                     <div className="text-lg font-semibold tracking-tight">48h</div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <div className="text-xs text-zinc-600">
                       Typical kickoff
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm">
                     <div className="text-lg font-semibold tracking-tight">Premium</div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <div className="text-xs text-zinc-600">
                       Quality delivery
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                  <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm">
                     <div className="text-lg font-semibold tracking-tight">Mobile</div>
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <div className="text-xs text-zinc-600">
                       First experience
                     </div>
                   </div>
@@ -187,24 +79,24 @@ export default function Home() {
               </div>
 
               <div className="relative">
-                <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-indigo-500/15 via-fuchsia-500/10 to-emerald-500/10 blur-2xl" />
-                <div className="overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900">
-                  <div className="flex items-center justify-between border-b border-zinc-900/10 px-5 py-4 dark:border-white/10">
+                <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-zinc-950/10 via-zinc-700/5 to-zinc-200/10 blur-2xl" />
+                <div className="overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-xl">
+                  <div className="flex items-center justify-between border-b border-zinc-900/10 px-5 py-4">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-rose-400" />
                       <span className="h-2 w-2 rounded-full bg-amber-300" />
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
                     </div>
-                    <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    <div className="text-xs font-medium text-zinc-500">
                       Fast · Clean · Premium
                     </div>
                   </div>
 
                   <div className="p-6 sm:p-8">
                     <div className="grid gap-4">
-                      <div className="rounded-2xl border border-zinc-900/10 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-950">
+                      <div className="rounded-2xl border border-zinc-900/10 bg-zinc-50 p-4">
                         <div className="text-sm font-semibold">What you get</div>
-                        <div className="mt-2 grid gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                        <div className="mt-2 grid gap-2 text-sm text-zinc-600">
                           <div className="flex items-start gap-2">
                             <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             A premium landing page designed for conversions
@@ -221,16 +113,16 @@ export default function Home() {
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <div className="rounded-2xl border border-zinc-900/10 bg-white p-4">
+                          <div className="text-xs text-zinc-500">
                             Response time
                           </div>
                           <div className="mt-1 text-lg font-semibold tracking-tight">
                             Same day
                           </div>
                         </div>
-                        <div className="rounded-2xl border border-zinc-900/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <div className="rounded-2xl border border-zinc-900/10 bg-white p-4">
+                          <div className="text-xs text-zinc-500">
                             Satisfaction
                           </div>
                           <div className="mt-1 text-lg font-semibold tracking-tight">
@@ -239,16 +131,16 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-2 rounded-2xl border border-zinc-900/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
+                      <div className="flex flex-col gap-2 rounded-2xl border border-zinc-900/10 bg-white p-4">
                         <div className="text-sm font-semibold">Trusted by</div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1 dark:border-white/10 dark:bg-zinc-950">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1">
                             Local brands
                           </span>
-                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1 dark:border-white/10 dark:bg-zinc-950">
+                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1">
                             Startups
                           </span>
-                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1 dark:border-white/10 dark:bg-zinc-950">
+                          <span className="rounded-full border border-zinc-900/10 bg-zinc-50 px-3 py-1">
                             Service businesses
                           </span>
                         </div>
@@ -262,13 +154,13 @@ export default function Home() {
 
           <section id="services" className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
             <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                 Services
               </p>
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Everything you need for a premium presence
               </h2>
-              <p className="max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+              <p className="max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                 Choose what you need today—scale later. Designed to look premium on
                 mobile and feel effortless on desktop.
               </p>
@@ -303,18 +195,18 @@ export default function Home() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="group rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-zinc-900"
+                  className="group rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="text-base font-semibold tracking-tight">
                         {item.title}
                       </h3>
-                      <p className="mt-2 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+                      <p className="mt-2 text-sm leading-7 text-zinc-600">
                         {item.desc}
                       </p>
                     </div>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-zinc-950 text-white shadow-sm transition group-hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:group-hover:bg-zinc-200">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-zinc-950 text-white shadow-sm transition group-hover:bg-zinc-900">
                       <span className="text-sm">→</span>
                     </div>
                   </div>
@@ -326,13 +218,13 @@ export default function Home() {
           <section id="features" className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
             <div className="grid gap-10 lg:grid-cols-2">
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   Why us
                 </p>
                 <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                   Premium feel, built for mobile conversions
                 </h2>
-                <p className="max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+                <p className="max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                   Mobile-first typography, high-contrast CTAs, and trust signals
                   that help people decide quickly.
                 </p>
@@ -358,12 +250,12 @@ export default function Home() {
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900"
+                    className="rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm"
                   >
                     <h3 className="text-base font-semibold tracking-tight">
                       {item.title}
                     </h3>
-                    <p className="mt-2 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+                    <p className="mt-2 text-sm leading-7 text-zinc-600">
                       {item.desc}
                     </p>
                   </div>
@@ -375,13 +267,13 @@ export default function Home() {
           <section id="testimonials" className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
             <div className="flex items-end justify-between gap-6">
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   Results
                 </p>
                 <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                   What clients say
                 </h2>
-                <p className="max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+                <p className="max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                   Replace these with real reviews when you have them—this section
                   boosts trust dramatically.
                 </p>
@@ -412,9 +304,9 @@ export default function Home() {
                 ].map((t) => (
                   <div
                     key={t.quote}
-                    className="w-[85%] shrink-0 snap-start rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900 sm:w-[48%] lg:w-[32%]"
+                    className="w-[85%] shrink-0 snap-start rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm sm:w-[48%] lg:w-[32%]"
                   >
-                    <div className="text-sm leading-7 text-zinc-700 dark:text-zinc-200">
+                    <div className="text-sm leading-7 text-zinc-700">
                       “{t.quote}”
                     </div>
                     <div className="mt-5 flex items-center justify-between">
@@ -422,7 +314,7 @@ export default function Home() {
                         <div className="text-sm font-semibold tracking-tight">
                           {t.name}
                         </div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <div className="text-xs text-zinc-500">
                           {t.role}
                         </div>
                       </div>
@@ -438,13 +330,13 @@ export default function Home() {
 
           <section id="faq" className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                 FAQ
               </p>
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Quick answers
               </h2>
-              <p className="max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300 sm:text-base">
+              <p className="max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
                 Everything here works without extra JavaScript—great for mobile
                 performance.
               </p>
@@ -471,7 +363,7 @@ export default function Home() {
               ].map((item) => (
                 <details
                   key={item.q}
-                  className="group rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm open:shadow-md dark:border-white/10 dark:bg-zinc-900"
+                  className="group rounded-3xl border border-zinc-900/10 bg-white p-6 shadow-sm open:shadow-md"
                 >
                   <summary className="cursor-pointer list-none text-sm font-semibold tracking-tight">
                     <span className="mr-2 inline-block text-zinc-400 transition group-open:rotate-90">
@@ -479,7 +371,7 @@ export default function Home() {
                     </span>
                     {item.q}
                   </summary>
-                  <p className="mt-3 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+                  <p className="mt-3 text-sm leading-7 text-zinc-600">
                     {item.a}
                   </p>
                 </details>
@@ -488,27 +380,27 @@ export default function Home() {
           </section>
         </main>
 
-        <footer className="border-t border-zinc-900/5 bg-zinc-50 py-10 dark:border-white/10 dark:bg-zinc-950">
+        <footer className="border-t border-zinc-900/5 bg-zinc-50 py-10">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-900 text-zinc-50 dark:bg-white dark:text-zinc-900">
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-900 text-zinc-50">
                 <span className="text-sm font-semibold">G</span>
               </div>
               <div>
                 <div className="text-sm font-semibold tracking-tight">
                   {business.name}
                 </div>
-                <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                <div className="text-xs text-zinc-600">
                   © {new Date().getFullYear()} · All rights reserved
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 text-sm text-zinc-600 dark:text-zinc-300">
-              <a className="hover:text-zinc-950 dark:hover:text-zinc-50" href="#services">
+            <div className="flex flex-wrap gap-3 text-sm text-zinc-600">
+              <a className="hover:text-zinc-950" href="#services">
                 Services
               </a>
-              <a className="hover:text-zinc-950 dark:hover:text-zinc-50" href="#features">
+              <a className="hover:text-zinc-950" href="#features">
                 Why us
               </a>
             </div>

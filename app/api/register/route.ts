@@ -279,6 +279,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const requestedStatus = String(form.get("status") ?? "").trim();
+  const wantsSubmit = requestedStatus === "submitted";
+  const wantsResetToDraft = requestedStatus === "draft";
+
   const shopImagesByLocationId = new Map<string, File>();
   for (const [key, value] of form.entries()) {
     if (!key.startsWith("shopImage_")) continue;
@@ -349,9 +353,44 @@ export async function POST(request: Request) {
     );
   }
 
+  if (form.has("businessName") && !businessName) {
+    return NextResponse.json(
+      { ok: false, message: "Business name is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("businessDescription") && !businessDescription) {
+    return NextResponse.json(
+      { ok: false, message: "Business description is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("businessType") && !businessType) {
+    return NextResponse.json(
+      { ok: false, message: "Business type is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("email") && !email) {
+    return NextResponse.json(
+      { ok: false, message: "Email is required." },
+      { status: 400 }
+    );
+  }
+
   if (email && !isValidEmail(email)) {
     return NextResponse.json(
       { ok: false, message: "Please enter a valid email." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("website") && !website) {
+    return NextResponse.json(
+      { ok: false, message: "Website is required." },
       { status: 400 }
     );
   }
@@ -363,9 +402,44 @@ export async function POST(request: Request) {
     );
   }
 
+  if (form.has("gstNumber") && !gstNumber) {
+    return NextResponse.json(
+      { ok: false, message: "GST number is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("businessRole") && !businessRole) {
+    return NextResponse.json(
+      { ok: false, message: "Business role is required." },
+      { status: 400 }
+    );
+  }
+
   if (businessRole && !["owner", "manager", "employee"].includes(businessRole)) {
     return NextResponse.json(
       { ok: false, message: "Business role must be owner, manager, or employee." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("name") && !name) {
+    return NextResponse.json(
+      { ok: false, message: "Name is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("contactNo") && !contactNo) {
+    return NextResponse.json(
+      { ok: false, message: "Contact number is required." },
+      { status: 400 }
+    );
+  }
+
+  if (form.has("whatsappNo") && !whatsappNo) {
+    return NextResponse.json(
+      { ok: false, message: "WhatsApp number is required." },
       { status: 400 }
     );
   }
@@ -475,6 +549,13 @@ export async function POST(request: Request) {
     }
   }
 
+  if (form.has("businessLogo") && !(businessLogo instanceof File)) {
+    return NextResponse.json(
+      { ok: false, message: "Business logo is required." },
+      { status: 400 }
+    );
+  }
+
   if (gstDocument instanceof File) {
     const maxBytes = 5 * 1024 * 1024;
     if (gstDocument.size > maxBytes) {
@@ -492,6 +573,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+  }
+
+  if (form.has("gstDocument") && !(gstDocument instanceof File)) {
+    return NextResponse.json(
+      { ok: false, message: "GST document is required." },
+      { status: 400 }
+    );
   }
 
   if (form.has("businessLocations")) {
@@ -571,10 +659,14 @@ export async function POST(request: Request) {
     ? (existingBusiness.data()?.status as unknown)
     : undefined;
 
-  const nextStatus: BusinessStatus =
-    isBusinessStatus(existingStatusRaw) && existingStatusRaw !== "draft"
-      ? existingStatusRaw
-      : "draft";
+  const nextStatus: BusinessStatus = (() => {
+    if (isBusinessStatus(existingStatusRaw)) {
+      if (existingStatusRaw === "rejected" && wantsResetToDraft) return "draft";
+      if (existingStatusRaw !== "draft") return existingStatusRaw;
+    }
+
+    return wantsSubmit ? "submitted" : "draft";
+  })();
 
   const payload: Record<string, unknown> = {
     userId: uid,
@@ -674,7 +766,7 @@ export async function POST(request: Request) {
     {
       ok: true,
       status: nextStatus,
-      message: "Draft saved.",
+      message: wantsSubmit ? "Submitted." : wantsResetToDraft ? "Draft started." : "Draft saved.",
     },
     { status: 200 }
   );

@@ -3,6 +3,18 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+type BusinessStatus = "draft" | "submitted" | "pending" | "verified" | "rejected";
+
+function asBusinessStatus(value: unknown): BusinessStatus | null {
+  return value === "draft" ||
+    value === "submitted" ||
+    value === "pending" ||
+    value === "verified" ||
+    value === "rejected"
+    ? value
+    : null;
+}
+
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
@@ -13,6 +25,7 @@ type BusinessDraftResponse = {
   ok?: boolean;
   business?:
     | {
+        status?: string;
         businessCategory?: string;
         otherCategoryName?: string;
         vehicleTypes?: string[];
@@ -81,37 +94,48 @@ export default function RegisterCategoryPage() {
   const [shopType, setShopType] = useState<ShopType | "">("");
   const [brands, setBrands] = useState<BrandId[]>([]);
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const needsVehicleTypes = useMemo(() => {
     if (!businessCategory) return false;
     return VEHICLE_CATEGORIES.has(businessCategory);
   }, [businessCategory]);
 
+  const fieldErrors = useMemo(() => {
+    const errors: Record<string, string> = {};
+
+    if (!businessCategory) errors.businessCategory = "Please select your business category.";
+
+    if (businessCategory === "Others" && !otherCategoryName.trim()) {
+      errors.otherCategoryName = "Please enter category name.";
+    }
+
+    if (businessCategory && needsVehicleTypes && vehicleTypes.length === 0) {
+      errors.vehicleTypes = "Please select at least one vehicle type.";
+    }
+
+    if (businessCategory && !needsVehicleTypes && !shopType) {
+      errors.shopType = "Please select your shop type.";
+    }
+
+    if (businessCategory && !needsVehicleTypes && shopType === "authorised shop" && brands.length !== 1) {
+      errors.brands = "Please select exactly one brand.";
+    }
+
+    if (businessCategory && !needsVehicleTypes && shopType === "local shop") {
+      if (brands.length === 0) errors.brands = "Please select at least one brand.";
+      if (brands.length > 5) errors.brands = "You can select up to 5 brands.";
+    }
+
+    return errors;
+  }, [brands.length, businessCategory, needsVehicleTypes, otherCategoryName, shopType, vehicleTypes.length]);
+
   const validationError = useMemo(() => {
-    if (!businessCategory) return "Please select your business category.";
-    if (businessCategory === "Others" && !otherCategoryName.trim())
-      return "Please enter category name.";
-    if (needsVehicleTypes && vehicleTypes.length === 0)
-      return "Please select at least one vehicle type.";
-    if (!needsVehicleTypes && !shopType) return "Please select your shop type.";
+    const firstError = Object.values(fieldErrors).find(Boolean);
+    return firstError ?? null;
+  }, [fieldErrors]);
 
-    if (!needsVehicleTypes && shopType === "authorised shop" && brands.length !== 1) {
-      return "Please select exactly one brand.";
-    }
-
-    if (!needsVehicleTypes && shopType === "local shop") {
-      if (brands.length === 0) return "Please select at least one brand.";
-      if (brands.length > 5) return "You can select up to 5 brands.";
-    }
-    return null;
-  }, [
-    brands.length,
-    businessCategory,
-    needsVehicleTypes,
-    otherCategoryName,
-    shopType,
-    vehicleTypes.length,
-  ]);
+  const canSubmit = submitState.status !== "submitting" && !validationError;
 
   useEffect(() => {
     const token = (() => {
@@ -139,6 +163,20 @@ export default function RegisterCategoryPage() {
 
         const data = (await res.json().catch(() => null)) as BusinessDraftResponse | null;
         if (!data?.ok || !data.business) return;
+
+        const status = asBusinessStatus(data.business?.status);
+        if (status === "submitted" || status === "pending") {
+          router.replace("/register/verification");
+          return;
+        }
+        if (status === "verified") {
+          router.replace("/dashboard");
+          return;
+        }
+        if (status === "rejected") {
+          router.replace("/register/rejected");
+          return;
+        }
 
         const nextCategory = (data.business.businessCategory ?? "") as
           | BusinessCategory
@@ -186,6 +224,13 @@ export default function RegisterCategoryPage() {
     e.preventDefault();
 
     if (validationError) {
+      setTouched({
+        businessCategory: true,
+        otherCategoryName: true,
+        vehicleTypes: true,
+        shopType: true,
+        brands: true,
+      });
       setSubmitState({ status: "error", message: validationError });
       return;
     }
@@ -257,18 +302,18 @@ export default function RegisterCategoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <div className="relative isolate overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-indigo-500/30 via-fuchsia-500/20 to-emerald-500/20 blur-3xl" />
-          <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-zinc-950/20 via-zinc-700/10 to-zinc-200/15 blur-3xl" />
+          <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-950/0 via-zinc-700/10 to-zinc-950/0 blur-3xl" />
         </div>
 
         <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
           <div className="grid gap-2">
             <div>
               <div className="text-lg font-semibold tracking-tight">Business category</div>
-              <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              <div className="mt-1 text-sm text-zinc-600">
                 Help us understand what type of business you run.
               </div>
             </div>
@@ -284,8 +329,8 @@ export default function RegisterCategoryPage() {
                         key={category}
                         className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                           active
-                            ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
-                            : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
+                            ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
+                            : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
                         }`}
                       >
                         <span className="min-w-0 truncate">{category}</span>
@@ -299,18 +344,22 @@ export default function RegisterCategoryPage() {
                             setVehicleTypes([]);
                             setShopType("");
                             setBrands([]);
+                            setTouched((prev) => ({ ...prev, businessCategory: true }));
                             setSubmitState({ status: "idle" });
                           }}
                           className="peer sr-only"
                         />
                         <span
-                          className="relative h-6 w-6 flex-none rounded-full border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-indigo-600 dark:border-white/15 dark:bg-zinc-950 after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-indigo-600 after:opacity-0 after:transition peer-checked:after:opacity-100"
+                          className="relative h-6 w-6 flex-none rounded-full border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-zinc-950 after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-zinc-950 after:opacity-0 after:transition peer-checked:after:opacity-100"
                           aria-hidden="true"
                         />
                       </label>
                     );
                   })}
                 </div>
+                {touched.businessCategory && fieldErrors.businessCategory && (
+                  <div className="text-xs text-rose-600">{fieldErrors.businessCategory}</div>
+                )}
               </div>
 
               {businessCategory === "Others" && (
@@ -320,14 +369,19 @@ export default function RegisterCategoryPage() {
                   </label>
                   <input
                     id="otherCategoryName"
-                    className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:focus:border-white/20 dark:focus:bg-zinc-950"
+                    className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
                     value={otherCategoryName}
                     onChange={(e) => {
                       setOtherCategoryName(e.target.value);
+                      setTouched((prev) => ({ ...prev, otherCategoryName: true }));
                       setSubmitState({ status: "idle" });
                     }}
+                    onBlur={() => setTouched((prev) => ({ ...prev, otherCategoryName: true }))}
                     placeholder="Enter your category"
                   />
+                  {touched.otherCategoryName && fieldErrors.otherCategoryName && (
+                    <div className="text-xs text-rose-600">{fieldErrors.otherCategoryName}</div>
+                  )}
                 </div>
               )}
 
@@ -342,8 +396,8 @@ export default function RegisterCategoryPage() {
                           key={type}
                           className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             checked
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
                           }`}
                         >
                           <span className="min-w-0 truncate">{type}</span>
@@ -356,18 +410,22 @@ export default function RegisterCategoryPage() {
                                   ? prev.filter((value) => value !== type)
                                   : [...prev, type]
                               );
+                              setTouched((prev) => ({ ...prev, vehicleTypes: true }));
                               setSubmitState({ status: "idle" });
                             }}
                             className="peer sr-only"
                           />
                           <span
-                            className="relative h-6 w-6 flex-none rounded-lg border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-emerald-600 peer-checked:bg-emerald-600 dark:border-white/15 dark:bg-zinc-950 after:absolute after:left-[8px] after:top-[4px] after:h-[12px] after:w-[6px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:opacity-0 after:transition peer-checked:after:opacity-100"
+                            className="relative h-6 w-6 flex-none rounded-lg border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-emerald-600 peer-checked:bg-emerald-600 after:absolute after:left-[8px] after:top-[4px] after:h-[12px] after:w-[6px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:opacity-0 after:transition peer-checked:after:opacity-100"
                             aria-hidden="true"
                           />
                         </label>
                       );
                     })}
                   </div>
+                  {touched.vehicleTypes && fieldErrors.vehicleTypes && (
+                    <div className="text-xs text-rose-600">{fieldErrors.vehicleTypes}</div>
+                  )}
                 </div>
               )}
 
@@ -382,8 +440,8 @@ export default function RegisterCategoryPage() {
                           key={type}
                           className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             active
-                              ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
-                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
+                              ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
                           }`}
                         >
                           <span className="min-w-0 truncate">{type}</span>
@@ -394,18 +452,22 @@ export default function RegisterCategoryPage() {
                             onChange={() => {
                               setShopType(type);
                               setBrands([]);
+                              setTouched((prev) => ({ ...prev, shopType: true }));
                               setSubmitState({ status: "idle" });
                             }}
                             className="peer sr-only"
                           />
                           <span
-                            className="relative h-6 w-6 flex-none rounded-full border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-indigo-600 dark:border-white/15 dark:bg-zinc-950 after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-indigo-600 after:opacity-0 after:transition peer-checked:after:opacity-100"
+                            className="relative h-6 w-6 flex-none rounded-full border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-zinc-950 after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-zinc-950 after:opacity-0 after:transition peer-checked:after:opacity-100"
                             aria-hidden="true"
                           />
                         </label>
                       );
                     })}
                   </div>
+                  {touched.shopType && fieldErrors.shopType && (
+                    <div className="text-xs text-rose-600">{fieldErrors.shopType}</div>
+                  )}
                 </div>
               )}
 
@@ -413,7 +475,7 @@ export default function RegisterCategoryPage() {
                 <div className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-medium">Brands</div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <div className="text-xs text-zinc-500">
                       {shopType === "authorised shop"
                         ? "Select 1"
                         : `Select up to 5 (${brands.length}/5)`}
@@ -431,8 +493,8 @@ export default function RegisterCategoryPage() {
                           key={brand.id}
                           className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition ${
                             active
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
                           } ${
                             disabled
                               ? "cursor-not-allowed opacity-60"
@@ -441,7 +503,7 @@ export default function RegisterCategoryPage() {
                           aria-disabled={disabled}
                         >
                           <span
-                            className="grid h-14 w-14 place-items-center rounded-3xl border border-zinc-900/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200"
+                            className="grid h-14 w-14 place-items-center rounded-3xl border border-zinc-900/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm"
                             aria-hidden="true"
                           >
                             {brand.name.slice(0, 2).toUpperCase()}
@@ -456,6 +518,7 @@ export default function RegisterCategoryPage() {
                             disabled={disabled}
                             onChange={() => {
                               setSubmitState({ status: "idle" });
+                              setTouched((prev) => ({ ...prev, brands: true }));
 
                               if (shopType === "authorised shop") {
                                 setBrands([brand.id]);
@@ -473,11 +536,11 @@ export default function RegisterCategoryPage() {
                           />
 
                           <span
-                            className={`absolute right-2 top-2 h-7 w-7 rounded-xl border bg-white shadow-sm transition dark:bg-zinc-950 ${
+                            className={`absolute right-2 top-2 h-7 w-7 rounded-xl border bg-white shadow-sm transition ${
                               shopType === "authorised shop"
                                 ? "peer-checked:border-emerald-600"
                                 : "peer-checked:border-emerald-600 peer-checked:bg-emerald-600"
-                            } border-zinc-900/15 dark:border-white/15 ${
+                            } border-zinc-900/15 ${
                               shopType === "authorised shop"
                                 ? "after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-emerald-600 after:opacity-0 after:transition peer-checked:after:opacity-100"
                                 : "after:absolute after:left-[10px] after:top-[6px] after:h-[12px] after:w-[6px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:opacity-0 after:transition peer-checked:after:opacity-100"
@@ -488,6 +551,10 @@ export default function RegisterCategoryPage() {
                       );
                     })}
                   </div>
+
+                  {touched.brands && fieldErrors.brands && (
+                    <div className="text-xs text-rose-600">{fieldErrors.brands}</div>
+                  )}
                 </div>
               )}
 
@@ -495,8 +562,8 @@ export default function RegisterCategoryPage() {
                 <div
                   className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${
                     submitState.status === "success"
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                      : "border-rose-500/20 bg-rose-500/10 text-rose-700"
                   }`}
                   role="status"
                 >
@@ -506,8 +573,8 @@ export default function RegisterCategoryPage() {
 
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-                disabled={submitState.status === "submitting"}
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!canSubmit}
               >
                 {submitState.status === "submitting" ? "Saving…" : "Continue"}
               </button>
