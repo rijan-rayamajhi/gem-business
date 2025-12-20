@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -265,36 +264,16 @@ export default function RegisterCategoryPage() {
           <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
         </div>
 
-        <header className="sticky top-0 z-30 border-b border-zinc-900/5 bg-zinc-50/70 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/60">
-          <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-semibold tracking-tight">GEM Business</div>
-              <div className="truncate text-xs text-zinc-600 dark:text-zinc-400">
-                Business registration
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-                href="/register"
-              >
-                Back
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-          <div className="overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900">
-            <div className="border-b border-zinc-900/10 px-6 py-5 dark:border-white/10">
+        <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
+          <div className="grid gap-2">
+            <div>
               <div className="text-lg font-semibold tracking-tight">Business category</div>
               <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
                 Help us understand what type of business you run.
               </div>
             </div>
 
-            <form className="grid gap-4 p-6 sm:p-8" onSubmit={onSubmit}>
+            <form className="grid gap-4" onSubmit={onSubmit}>
               <div className="grid gap-2">
                 <div className="text-sm font-medium">Category</div>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -303,10 +282,10 @@ export default function RegisterCategoryPage() {
                     return (
                       <label
                         key={category}
-                        className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-sm transition active:scale-[0.99] ${
+                        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                           active
                             ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
-                            : "border-zinc-900/10 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+                            : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
                         }`}
                       >
                         <span className="min-w-0 truncate">{category}</span>
@@ -361,10 +340,10 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={type}
-                          className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-sm transition active:scale-[0.99] ${
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             checked
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                              : "border-zinc-900/10 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
                           }`}
                         >
                           <span className="min-w-0 truncate">{type}</span>
@@ -401,10 +380,10 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={type}
-                          className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-medium shadow-sm transition active:scale-[0.99] ${
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             active
                               ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
-                              : "border-zinc-900/10 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
                           }`}
                         >
                           <span className="min-w-0 truncate">{type}</span>
@@ -450,10 +429,10 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={brand.id}
-                          className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-4 text-center shadow-sm transition active:scale-[0.99] ${
+                          className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition ${
                             active
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                              : "border-zinc-900/10 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80 dark:border-white/10 dark:bg-zinc-950/30 dark:text-zinc-50 dark:hover:bg-zinc-950/45"
                           } ${
                             disabled
                               ? "cursor-not-allowed opacity-60"

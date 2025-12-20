@@ -15,11 +15,9 @@ function hasToken() {
 }
 
 export default function AppOnly({ children }: Props) {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(() => hasToken());
 
   useEffect(() => {
-    setEnabled(hasToken());
-
     const onAuth = () => setEnabled(hasToken());
     window.addEventListener("gem-auth", onAuth);
     return () => window.removeEventListener("gem-auth", onAuth);

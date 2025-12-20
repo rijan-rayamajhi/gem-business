@@ -1,13 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 type FormState = {
   email: string;
   website: string;
+  gstNumber: string;
   businessName: string;
   businessDescription: string;
   businessType: "online" | "offline" | "both" | "";
@@ -33,11 +33,13 @@ type BusinessDraftResponse = {
         businessType?: string;
         email?: string;
         website?: string;
+        gstNumber?: string;
+        gstDocumentUrl?: string;
         businessRole?: string;
         name?: string;
         contactNo?: string;
         whatsappNo?: string;
-        businessLogo?: unknown;
+        businessLogoUrl?: string;
       }
     | null;
 };
@@ -45,6 +47,7 @@ type BusinessDraftResponse = {
 const initialForm: FormState = {
   email: "",
   website: "",
+  gstNumber: "",
   businessName: "",
   businessDescription: "",
   businessType: "",
@@ -72,24 +75,20 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(initialForm);
   const [businessLogoFile, setBusinessLogoFile] = useState<File | null>(null);
-  const [businessLogoPreviewUrl, setBusinessLogoPreviewUrl] = useState<
-    string | null
-  >(null);
+  const [existingBusinessLogoUrl, setExistingBusinessLogoUrl] = useState<string>("");
+  const [gstDocumentFile, setGstDocumentFile] = useState<File | null>(null);
+  const [existingGstDocumentUrl, setExistingGstDocumentUrl] = useState<string>("");
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
 
-  useEffect(() => {
-    if (!businessLogoFile) {
-      setBusinessLogoPreviewUrl(null);
-      return;
-    }
-
-    const nextUrl = URL.createObjectURL(businessLogoFile);
-    setBusinessLogoPreviewUrl(nextUrl);
-
-    return () => {
-      URL.revokeObjectURL(nextUrl);
-    };
+  const businessLogoPreviewUrl = useMemo(() => {
+    return businessLogoFile ? URL.createObjectURL(businessLogoFile) : null;
   }, [businessLogoFile]);
+
+  useEffect(() => {
+    return () => {
+      if (businessLogoPreviewUrl) URL.revokeObjectURL(businessLogoPreviewUrl);
+    };
+  }, [businessLogoPreviewUrl]);
 
   const validationError = useMemo(() => {
     if (form.email.trim() && !isValidEmail(form.email))
@@ -130,6 +129,7 @@ export default function RegisterPage() {
           ...prev,
           email: data.business?.email ?? "",
           website: data.business?.website ?? "",
+          gstNumber: data.business?.gstNumber ?? "",
           businessName: data.business?.businessName ?? "",
           businessDescription: data.business?.businessDescription ?? "",
           businessType: (data.business?.businessType ?? "") as FormState["businessType"],
@@ -138,6 +138,14 @@ export default function RegisterPage() {
           contactNo: data.business?.contactNo ?? "",
           whatsappNo: data.business?.whatsappNo ?? "",
         }));
+
+        setExistingBusinessLogoUrl(
+          typeof data.business?.businessLogoUrl === "string" ? data.business.businessLogoUrl : ""
+        );
+
+        setExistingGstDocumentUrl(
+          typeof data.business?.gstDocumentUrl === "string" ? data.business.gstDocumentUrl : ""
+        );
       } catch {
         // ignore
       }
@@ -181,6 +189,8 @@ export default function RegisterPage() {
       payload.append("businessType", form.businessType);
       payload.append("email", form.email.trim().toLowerCase());
       payload.append("website", form.website.trim());
+      payload.append("gstNumber", form.gstNumber.trim());
+      if (gstDocumentFile) payload.append("gstDocument", gstDocumentFile);
       payload.append("businessRole", form.businessRole);
       payload.append("name", form.name.trim());
       payload.append("contactNo", form.contactNo.trim());
@@ -228,36 +238,7 @@ export default function RegisterPage() {
           <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-900/0 via-indigo-500/15 to-zinc-900/0 blur-3xl dark:from-zinc-950/0 dark:via-indigo-500/15 dark:to-zinc-950/0" />
         </div>
 
-        <header className="sticky top-0 z-30 border-b border-zinc-900/5 bg-zinc-50/70 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/60">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <Link className="flex min-w-0 items-center gap-3" href="/">
-              <div className="rounded-2xl bg-gradient-to-tr from-indigo-500/60 via-fuchsia-500/40 to-emerald-500/40 p-[1px] shadow-sm">
-                <div className="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-950 text-zinc-50 dark:bg-white dark:text-zinc-950">
-                  <span className="text-sm font-semibold">G</span>
-                </div>
-              </div>
-              <div className="min-w-0 leading-tight">
-                <div className="truncate text-sm font-semibold tracking-tight">
-                  GEM Business
-                </div>
-                <div className="hidden truncate text-xs text-zinc-600 dark:text-zinc-400 sm:block">
-                  Business registration
-                </div>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <Link
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-                href="/"
-              >
-                Back
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-12">
           <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-10">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-zinc-900/10 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300">
@@ -281,12 +262,10 @@ export default function RegisterPage() {
                 ].map((item) => (
                   <div
                     key={item}
-                    className="flex items-start gap-2 rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900"
+                    className="flex items-start gap-2 border-b border-zinc-900/10 py-3 text-sm text-zinc-700 last:border-b-0 dark:border-white/10 dark:text-zinc-300"
                   >
                     <span className="mt-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                      {item}
-                    </div>
+                    <div>{item}</div>
                   </div>
                 ))}
               </div>
@@ -294,17 +273,15 @@ export default function RegisterPage() {
 
             <div className="relative">
               <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-indigo-500/15 via-fuchsia-500/10 to-emerald-500/10 blur-2xl" />
-              <div className="overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900">
-                <div className="border-b border-zinc-900/10 px-6 py-5 dark:border-white/10">
-                  <div className="text-lg font-semibold tracking-tight">
-                    Registration
-                  </div>
+              <div className="grid gap-2">
+                <div>
+                  <div className="text-lg font-semibold tracking-tight">Registration</div>
                   <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
                     Tell us about your business.
                   </div>
                 </div>
 
-                <form className="grid gap-4 p-6 sm:p-8" onSubmit={onSubmit}>
+                <form className="grid gap-4" onSubmit={onSubmit}>
                   <div className="grid gap-3">
                     <div className="text-sm font-medium">Business logo</div>
 
@@ -315,6 +292,15 @@ export default function RegisterPage() {
                             <Image
                               src={businessLogoPreviewUrl}
                               alt="Business logo preview"
+                              width={64}
+                              height={64}
+                              className="h-full w-full object-cover"
+                              unoptimized
+                            />
+                          ) : existingBusinessLogoUrl ? (
+                            <Image
+                              src={existingBusinessLogoUrl}
+                              alt="Business logo"
                               width={64}
                               height={64}
                               className="h-full w-full object-cover"
@@ -446,6 +432,61 @@ export default function RegisterPage() {
                       }
                       placeholder="https://"
                     />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="gstNumber">
+                      GST number
+                    </label>
+                    <input
+                      id="gstNumber"
+                      className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:focus:border-white/20 dark:focus:bg-zinc-950"
+                      value={form.gstNumber}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, gstNumber: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="text-sm font-medium">GST document</div>
+                    <div className="flex items-center gap-4">
+                      <label className="relative inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900">
+                        Choose file
+                        <input
+                          id="gstDocument"
+                          name="gstDocument"
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="absolute h-px w-px opacity-0"
+                          onChange={(e) => {
+                            const nextFile = e.target.files?.[0] ?? null;
+                            setGstDocumentFile(nextFile);
+                          }}
+                        />
+                      </label>
+
+                      <div className="min-w-0 text-sm text-zinc-600 dark:text-zinc-300">
+                        {gstDocumentFile ? (
+                          <div className="truncate">{gstDocumentFile.name}</div>
+                        ) : existingGstDocumentUrl ? (
+                          <a
+                            className="truncate underline"
+                            href={existingGstDocumentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View uploaded document
+                          </a>
+                        ) : (
+                          <div className="text-zinc-500 dark:text-zinc-400">No file selected</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      PDF or image. Max 5MB.
+                    </div>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">

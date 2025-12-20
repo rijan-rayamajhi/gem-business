@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { FieldValue, adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { FieldValue, adminAuth, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -82,7 +82,38 @@ type BusinessLocation = {
   state: string;
   pincode: string;
   landmark: string;
+  contactNumber?: string;
+  shopImageUrl?: string;
+  businessHours?: unknown;
 };
+
+async function uploadImageToStorage(params: {
+  uid: string;
+  file: File;
+  folder: string;
+}) {
+  const { uid, file, folder } = params;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const safeName = (file.name || "image")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 120);
+  const objectPath = `${folder}/${uid}/${Date.now()}_${safeName}`;
+
+  const objectRef = adminStorageBucket.file(objectPath);
+  await objectRef.save(buffer, {
+    resumable: false,
+    metadata: {
+      contentType: file.type || "application/octet-stream",
+      cacheControl: "public, max-age=31536000",
+    },
+  });
+
+  await objectRef.makePublic();
+  const publicUrl = objectRef.publicUrl();
+
+  return { objectPath, publicUrl };
+}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -103,6 +134,10 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
     const state = typeof obj.state === "string" ? obj.state.trim() : "";
     const pincode = typeof obj.pincode === "string" ? obj.pincode.trim() : "";
     const landmark = typeof obj.landmark === "string" ? obj.landmark.trim() : "";
+    const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber.trim() : "";
+    const shopImageUrlRaw = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl.trim() : "";
+    const shopImageUrl = shopImageUrlRaw && isValidUrl(shopImageUrlRaw) ? shopImageUrlRaw : "";
+    const businessHours = obj.businessHours;
 
     if (!id) continue;
 
@@ -114,6 +149,9 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
       state,
       pincode,
       landmark,
+      ...(contactNumber ? { contactNumber } : {}),
+      ...(shopImageUrl ? { shopImageUrl } : {}),
+      ...(businessHours ? { businessHours } : {}),
     });
   }
 
@@ -187,16 +225,21 @@ export async function GET(request: Request) {
         businessType: typeof data.businessType === "string" ? data.businessType : "",
         email: typeof data.email === "string" ? data.email : "",
         website: typeof data.website === "string" ? data.website : "",
+        gstNumber: typeof data.gstNumber === "string" ? data.gstNumber : "",
+        gstDocumentUrl: typeof data.gstDocumentUrl === "string" ? data.gstDocumentUrl : "",
         businessRole: typeof data.businessRole === "string" ? data.businessRole : "",
         name: typeof data.name === "string" ? data.name : "",
         contactNo: typeof data.contactNo === "string" ? data.contactNo : "",
         whatsappNo: typeof data.whatsappNo === "string" ? data.whatsappNo : "",
-        businessLogo: data.businessLogo ?? null,
+        businessLogoUrl: typeof data.businessLogoUrl === "string" ? data.businessLogoUrl : "",
         businessLocations: Array.isArray(data.businessLocations)
           ? (data.businessLocations as unknown[])
               .filter((value) => value && typeof value === "object")
               .map((value) => {
                 const obj = value as Record<string, unknown>;
+                const shopImageUrl = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl : "";
+                const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber : "";
+                const businessHours = obj.businessHours ?? null;
                 return {
                   id: typeof obj.id === "string" ? obj.id : "",
                   addressLine1: typeof obj.addressLine1 === "string" ? obj.addressLine1 : "",
@@ -205,6 +248,9 @@ export async function GET(request: Request) {
                   state: typeof obj.state === "string" ? obj.state : "",
                   pincode: typeof obj.pincode === "string" ? obj.pincode : "",
                   landmark: typeof obj.landmark === "string" ? obj.landmark : "",
+                  ...(contactNumber ? { contactNumber } : {}),
+                  ...(shopImageUrl ? { shopImageUrl } : {}),
+                  ...(businessHours ? { businessHours } : {}),
                 };
               })
           : [],
@@ -233,6 +279,28 @@ export async function POST(request: Request) {
     );
   }
 
+  const shopImagesByLocationId = new Map<string, File>();
+  for (const [key, value] of form.entries()) {
+    if (!key.startsWith("shopImage_")) continue;
+    const locId = key.slice("shopImage_".length).trim();
+    if (!locId) continue;
+    if (!(value instanceof File)) continue;
+    const maxBytes = 5 * 1024 * 1024;
+    if (value.size > maxBytes) {
+      return NextResponse.json(
+        { ok: false, message: "Shop image must be under 5MB." },
+        { status: 400 }
+      );
+    }
+    if (!value.type.startsWith("image/")) {
+      return NextResponse.json(
+        { ok: false, message: "Shop image must be an image." },
+        { status: 400 }
+      );
+    }
+    shopImagesByLocationId.set(locId, value);
+  }
+
   const businessName = String(form.get("businessName") ?? "").trim();
   const businessDescription = String(form.get("businessDescription") ?? "").trim();
   const businessCategory = String(form.get("businessCategory") ?? "").trim();
@@ -249,6 +317,8 @@ export async function POST(request: Request) {
   const businessType = String(form.get("businessType") ?? "").trim();
   const email = String(form.get("email") ?? "").trim();
   const website = String(form.get("website") ?? "").trim();
+  const gstNumber = String(form.get("gstNumber") ?? "").trim();
+  const gstDocument = form.get("gstDocument");
   const businessRole = String(form.get("businessRole") ?? "").trim();
   const name = String(form.get("name") ?? "").trim();
   const contactNo = String(form.get("contactNo") ?? "").trim();
@@ -405,6 +475,25 @@ export async function POST(request: Request) {
     }
   }
 
+  if (gstDocument instanceof File) {
+    const maxBytes = 5 * 1024 * 1024;
+    if (gstDocument.size > maxBytes) {
+      return NextResponse.json(
+        { ok: false, message: "GST document must be under 5MB." },
+        { status: 400 }
+      );
+    }
+
+    const isPdf = gstDocument.type === "application/pdf";
+    const isImage = gstDocument.type.startsWith("image/");
+    if (!isPdf && !isImage) {
+      return NextResponse.json(
+        { ok: false, message: "GST document must be a PDF or an image." },
+        { status: 400 }
+      );
+    }
+  }
+
   if (form.has("businessLocations")) {
     if (businessLocations.length === 0) {
       return NextResponse.json(
@@ -488,7 +577,7 @@ export async function POST(request: Request) {
       : "draft";
 
   const payload: Record<string, unknown> = {
-    user_id: uid,
+    userId: uid,
     status: nextStatus,
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -515,16 +604,27 @@ export async function POST(request: Request) {
   if (businessType) payload.businessType = businessType;
   if (email) payload.email = email.toLowerCase();
   if (website) payload.website = website;
+  if (form.has("gstNumber")) payload.gstNumber = gstNumber;
   if (businessRole) payload.businessRole = businessRole;
   if (name) payload.name = name;
   if (contactNo) payload.contactNo = contactNo;
   if (whatsappNo) payload.whatsappNo = whatsappNo;
   if (businessLogo instanceof File) {
-    payload.businessLogo = {
-      name: businessLogo.name,
-      type: businessLogo.type,
-      size: businessLogo.size,
-    };
+    const upload = await uploadImageToStorage({
+      uid,
+      file: businessLogo,
+      folder: "businessLogos",
+    });
+    payload.businessLogoUrl = upload.publicUrl;
+  }
+
+  if (gstDocument instanceof File) {
+    const upload = await uploadImageToStorage({
+      uid,
+      file: gstDocument,
+      folder: "gstDocuments",
+    });
+    payload.gstDocumentUrl = upload.publicUrl;
   }
 
   if (form.has("businessLocations")) {
@@ -533,12 +633,39 @@ export async function POST(request: Request) {
   }
 
   if (shopImage instanceof File) {
+    const upload = await uploadImageToStorage({
+      uid,
+      file: shopImage,
+      folder: "shopImages",
+    });
     payload.primaryShopImage = {
       name: shopImage.name,
       type: shopImage.type,
       size: shopImage.size,
       locationId: shopImageLocationId,
+      url: upload.publicUrl,
     };
+  }
+
+  if (form.has("businessLocations") && shopImagesByLocationId.size > 0) {
+    const nextLocations: BusinessLocation[] = [];
+    for (const loc of businessLocations) {
+      const file = shopImagesByLocationId.get(loc.id);
+      if (!file) {
+        nextLocations.push(loc);
+        continue;
+      }
+      const upload = await uploadImageToStorage({
+        uid,
+        file,
+        folder: "shopImages",
+      });
+      nextLocations.push({
+        ...loc,
+        shopImageUrl: upload.publicUrl,
+      });
+    }
+    payload.businessLocations = nextLocations;
   }
 
   await businessRef.set(payload, { merge: true });
