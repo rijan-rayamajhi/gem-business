@@ -185,6 +185,7 @@ export default function RegisterPreviewPage() {
   const locations = Array.isArray(business?.businessLocations) ? business.businessLocations : [];
   const category = (business?.businessCategory ?? "").trim();
   const otherCategoryName = (business?.otherCategoryName ?? "").trim();
+  const businessType = (business?.businessType ?? "").trim();
 
   const businessStatus = asBusinessStatus(business?.status);
   const isLocked = businessStatus === "submitted" || businessStatus === "pending" || businessStatus === "verified";
@@ -194,49 +195,7 @@ export default function RegisterPreviewPage() {
   async function onSubmit() {
     if (!canSubmit) return;
 
-    const token = (() => {
-      try {
-        return sessionStorage.getItem("gem_id_token");
-      } catch {
-        return null;
-      }
-    })();
-
-    if (!token) {
-      setSubmitState({ status: "error", message: "Please open this page from the mobile app." });
-      return;
-    }
-
-    setSubmitState({ status: "submitting" });
-
-    try {
-      const payload = new FormData();
-      payload.append("status", "submitted");
-
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: payload,
-      });
-
-      const data = (await res.json().catch(() => null)) as
-        | { ok?: boolean; message?: string }
-        | null;
-
-      if (!res.ok || !data?.ok) {
-        setSubmitState({
-          status: "error",
-          message: data?.message || "Failed to submit. Please try again.",
-        });
-        return;
-      }
-
-      router.replace("/register/verification");
-    } catch {
-      setSubmitState({ status: "error", message: "Network error. Please try again." });
-    }
+    router.push("/register/kyc");
   }
 
   return (
@@ -290,31 +249,33 @@ export default function RegisterPreviewPage() {
           </div>
 
           <div className="mt-6 grid gap-5">
-            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60 shadow-sm">
-              <div className="relative aspect-video w-full bg-zinc-100">
-                {primaryShopImageUrl ? (
-                  <Image
-                    src={primaryShopImageUrl}
-                    alt="Primary shop image"
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 768px"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-                  <div className="text-sm font-semibold tracking-tight text-white">
-                    {primaryLocation?.landmark?.trim() || "Primary location"}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-200">
-                    {primaryLocation ? formatAddress(primaryLocation) : "Add a location to continue"}
+            {businessType !== "online" ? (
+              <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60 shadow-sm">
+                <div className="relative aspect-video w-full bg-zinc-100">
+                  {primaryShopImageUrl ? (
+                    <Image
+                      src={primaryShopImageUrl}
+                      alt="Primary shop image"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
+                    <div className="text-sm font-semibold tracking-tight text-white">
+                      {primaryLocation?.landmark?.trim() || "Primary location"}
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-200">
+                      {primaryLocation ? formatAddress(primaryLocation) : "Add a location to continue"}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-zinc-900/10 bg-white/60 p-5 shadow-sm">

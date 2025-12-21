@@ -27,10 +27,23 @@ function asBusinessStatus(value: unknown): BusinessStatus | null {
 
 export default function RegisterRejectedPage() {
   const router = useRouter();
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [state, setState] = useState<LoadState>(() => {
+    const token = (() => {
+      try {
+        return sessionStorage.getItem("gem_id_token");
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!token) return { status: "error", message: "Please open this page from the mobile app." };
+    return { status: "loading" };
+  });
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
 
   useEffect(() => {
+    if (state.status !== "loading") return;
+
     const token = (() => {
       try {
         return sessionStorage.getItem("gem_id_token");
@@ -40,7 +53,6 @@ export default function RegisterRejectedPage() {
     })();
 
     if (!token) {
-      setState({ status: "error", message: "Please open this page from the mobile app." });
       return;
     }
 

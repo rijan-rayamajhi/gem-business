@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GeoPoint } from "firebase-admin/firestore";
 import { FieldValue, adminAuth, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
@@ -23,7 +24,6 @@ const VEHICLE_CATEGORIES = new Set<BusinessCategory>([
   "Key Maker Shop",
   "Puncture Shop",
   "Towing Van",
-  "Others",
 ]);
 
 const VEHICLE_TYPES = [
@@ -35,20 +35,33 @@ const VEHICLE_TYPES = [
 
 const SHOP_TYPES = ["authorised shop", "local shop"] as const;
 
-const BRANDS = [
-  { id: "amaron", name: "Amaron" },
-  { id: "exide", name: "Exide" },
-  { id: "bosch", name: "Bosch" },
-  { id: "castrol", name: "Castrol" },
-  { id: "mobil", name: "Mobil" },
-  { id: "shell", name: "Shell" },
-  { id: "bridgestone", name: "Bridgestone" },
-  { id: "michelin", name: "Michelin" },
-  { id: "mrf", name: "MRF" },
-  { id: "ceat", name: "CEAT" },
-  { id: "goodyear", name: "Goodyear" },
-  { id: "others", name: "Other" },
-] as const;
+async function areSelectedBrandsValid(params: {
+  businessCategory: string;
+  brands: string[];
+}) {
+  const { businessCategory, brands } = params;
+  if (brands.length === 0) return true;
+
+  if (businessCategory === "Machanic Shop") {
+    const refs = brands.map((id) => adminDb.collection("vehicleBrands").doc(id));
+    const docs = await adminDb.getAll(...refs);
+    for (const doc of docs) {
+      if (!doc.exists) return false;
+      const data = doc.data() ?? {};
+      if (data.isActive !== true) return false;
+    }
+    return true;
+  }
+
+  const refs = brands.map((id) => adminDb.collection("brands").doc(id));
+  const docs = await adminDb.getAll(...refs);
+  for (const doc of docs) {
+    if (!doc.exists) return false;
+    const data = doc.data() ?? {};
+    if (data.status !== "ACTIVE") return false;
+  }
+  return true;
+}
 
 function isBusinessStatus(value: unknown): value is BusinessStatus {
   return (
@@ -84,6 +97,7 @@ type BusinessLocation = {
   landmark: string;
   contactNumber?: string;
   shopImageUrl?: string;
+  geo?: GeoPoint;
   businessHours?: unknown;
 };
 
@@ -137,6 +151,16 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
     const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber.trim() : "";
     const shopImageUrlRaw = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl.trim() : "";
     const shopImageUrl = shopImageUrlRaw && isValidUrl(shopImageUrlRaw) ? shopImageUrlRaw : "";
+    const geoRaw = obj.geo;
+    const geo = (() => {
+      if (!geoRaw || typeof geoRaw !== "object") return null;
+      const record = geoRaw as Record<string, unknown>;
+      const lat = typeof record.lat === "number" ? record.lat : null;
+      const lng = typeof record.lng === "number" ? record.lng : null;
+      if (lat === null || lng === null) return null;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return new GeoPoint(lat, lng);
+    })();
     const businessHours = obj.businessHours;
 
     if (!id) continue;
@@ -151,6 +175,7 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
       landmark,
       ...(contactNumber ? { contactNumber } : {}),
       ...(shopImageUrl ? { shopImageUrl } : {}),
+      ...(geo ? { geo } : {}),
       ...(businessHours ? { businessHours } : {}),
     });
   }
@@ -200,6 +225,61 @@ export async function GET(request: Request) {
   }
 
   const data = businessSnap.data() ?? {};
+  const businessLocationsQuerySnap = await adminDb
+    .collection("businessLocations")
+    .where("businessId", "==", uid)
+    .get();
+
+  const locationDocs = businessLocationsQuerySnap.docs;
+  const primaryLocationDoc =
+    locationDocs.find((doc) => Boolean(doc.data()?.isPrimary)) ?? locationDocs[0] ?? null;
+  const primaryBusinessLocationId = primaryLocationDoc?.id ?? "";
+  const primaryShopImage = primaryLocationDoc?.data()?.primaryShopImage ?? null;
+
+  const businessLocations = locationDocs
+    .map((doc) => ({ id: doc.id, ...(doc.data() ?? {}) }))
+    .filter((value) => value && typeof value === "object")
+    .map((value) => {
+      const obj = value as Record<string, unknown>;
+      const shopImageUrl = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl : "";
+      const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber : "";
+      const businessHours = obj.businessHours ?? null;
+      const geo = (() => {
+        const maybeGeo = obj.geo;
+        if (!maybeGeo || typeof maybeGeo !== "object") return null;
+        const rec = maybeGeo as Record<string, unknown>;
+        const lat =
+          typeof rec.latitude === "number"
+            ? rec.latitude
+            : typeof rec._latitude === "number"
+              ? rec._latitude
+              : null;
+        const lng =
+          typeof rec.longitude === "number"
+            ? rec.longitude
+            : typeof rec._longitude === "number"
+              ? rec._longitude
+              : null;
+        if (lat === null || lng === null) return null;
+        return { lat, lng };
+      })();
+
+      return {
+        id: typeof obj.id === "string" ? obj.id : "",
+        addressLine1: typeof obj.addressLine1 === "string" ? obj.addressLine1 : "",
+        addressLine2: typeof obj.addressLine2 === "string" ? obj.addressLine2 : "",
+        city: typeof obj.city === "string" ? obj.city : "",
+        state: typeof obj.state === "string" ? obj.state : "",
+        pincode: typeof obj.pincode === "string" ? obj.pincode : "",
+        landmark: typeof obj.landmark === "string" ? obj.landmark : "",
+        ...(contactNumber ? { contactNumber } : {}),
+        ...(shopImageUrl ? { shopImageUrl } : {}),
+        ...(geo ? { geo } : {}),
+        ...(businessHours ? { businessHours } : {}),
+      };
+    })
+    .filter((loc) => typeof loc.id === "string" && loc.id);
+
   const status = isBusinessStatus(data.status) ? data.status : "draft";
 
   return NextResponse.json(
@@ -232,31 +312,9 @@ export async function GET(request: Request) {
         contactNo: typeof data.contactNo === "string" ? data.contactNo : "",
         whatsappNo: typeof data.whatsappNo === "string" ? data.whatsappNo : "",
         businessLogoUrl: typeof data.businessLogoUrl === "string" ? data.businessLogoUrl : "",
-        businessLocations: Array.isArray(data.businessLocations)
-          ? (data.businessLocations as unknown[])
-              .filter((value) => value && typeof value === "object")
-              .map((value) => {
-                const obj = value as Record<string, unknown>;
-                const shopImageUrl = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl : "";
-                const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber : "";
-                const businessHours = obj.businessHours ?? null;
-                return {
-                  id: typeof obj.id === "string" ? obj.id : "",
-                  addressLine1: typeof obj.addressLine1 === "string" ? obj.addressLine1 : "",
-                  addressLine2: typeof obj.addressLine2 === "string" ? obj.addressLine2 : "",
-                  city: typeof obj.city === "string" ? obj.city : "",
-                  state: typeof obj.state === "string" ? obj.state : "",
-                  pincode: typeof obj.pincode === "string" ? obj.pincode : "",
-                  landmark: typeof obj.landmark === "string" ? obj.landmark : "",
-                  ...(contactNumber ? { contactNumber } : {}),
-                  ...(shopImageUrl ? { shopImageUrl } : {}),
-                  ...(businessHours ? { businessHours } : {}),
-                };
-              })
-          : [],
-        primaryBusinessLocationId:
-          typeof data.primaryBusinessLocationId === "string" ? data.primaryBusinessLocationId : "",
-        primaryShopImage: data.primaryShopImage ?? null,
+        businessLocations,
+        primaryBusinessLocationId,
+        primaryShopImage,
       },
     },
     { status: 200 }
@@ -497,16 +555,6 @@ export async function POST(request: Request) {
         );
       }
 
-      const allowedBrands = new Set<string>(BRANDS.map((b) => b.id));
-      for (const brand of brands) {
-        if (!allowedBrands.has(brand)) {
-          return NextResponse.json(
-            { ok: false, message: "Invalid brand selection." },
-            { status: 400 }
-          );
-        }
-      }
-
       if (shopType === "authorised shop") {
         if (brands.length !== 1) {
           return NextResponse.json(
@@ -529,6 +577,14 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
+      }
+
+      const validBrands = await areSelectedBrandsValid({ businessCategory, brands });
+      if (!validBrands) {
+        return NextResponse.json(
+          { ok: false, message: "Invalid brand selection." },
+          { status: 400 }
+        );
       }
     }
   }
@@ -719,26 +775,7 @@ export async function POST(request: Request) {
     payload.gstDocumentUrl = upload.publicUrl;
   }
 
-  if (form.has("businessLocations")) {
-    payload.businessLocations = businessLocations;
-    payload.primaryBusinessLocationId = primaryBusinessLocationId;
-  }
-
-  if (shopImage instanceof File) {
-    const upload = await uploadImageToStorage({
-      uid,
-      file: shopImage,
-      folder: "shopImages",
-    });
-    payload.primaryShopImage = {
-      name: shopImage.name,
-      type: shopImage.type,
-      size: shopImage.size,
-      locationId: shopImageLocationId,
-      url: upload.publicUrl,
-    };
-  }
-
+  let resolvedLocationsForSave = businessLocations;
   if (form.has("businessLocations") && shopImagesByLocationId.size > 0) {
     const nextLocations: BusinessLocation[] = [];
     for (const loc of businessLocations) {
@@ -757,10 +794,88 @@ export async function POST(request: Request) {
         shopImageUrl: upload.publicUrl,
       });
     }
-    payload.businessLocations = nextLocations;
+    resolvedLocationsForSave = nextLocations;
   }
 
+  const resolvedPrimaryShopImage =
+    shopImage instanceof File
+      ? {
+          name: shopImage.name,
+          type: shopImage.type,
+          size: shopImage.size,
+          locationId: shopImageLocationId,
+          url: (await uploadImageToStorage({
+            uid,
+            file: shopImage,
+            folder: "shopImages",
+          })).publicUrl,
+        }
+      : null;
+
   await businessRef.set(payload, { merge: true });
+
+  if (form.has("businessLocations")) {
+    const businessSnap = await businessRef.get();
+    const businessData = businessSnap.data() ?? {};
+
+    const resolvedBusinessName =
+      typeof businessData.businessName === "string" ? businessData.businessName : "";
+    const resolvedBusinessLogoUrl =
+      typeof businessData.businessLogoUrl === "string" ? businessData.businessLogoUrl : "";
+    const resolvedBusinessCategory =
+      typeof businessData.businessCategory === "string" ? businessData.businessCategory : "";
+
+    const existingLocationsSnap = await adminDb
+      .collection("businessLocations")
+      .where("businessId", "==", uid)
+      .get();
+
+    const existingIds = new Set<string>(existingLocationsSnap.docs.map((doc) => doc.id));
+    const incomingIds = new Set<string>(resolvedLocationsForSave.map((loc) => loc.id));
+
+    const batch = adminDb.batch();
+
+    for (const doc of existingLocationsSnap.docs) {
+      if (incomingIds.has(doc.id)) continue;
+      batch.delete(doc.ref);
+    }
+
+    for (const loc of resolvedLocationsForSave) {
+      const locRef = adminDb.collection("businessLocations").doc(loc.id);
+      const isPrimary = loc.id === primaryBusinessLocationId;
+      const locationPayload: Record<string, unknown> = {
+        businessId: uid,
+        businessName: resolvedBusinessName,
+        businessLogoUrl: resolvedBusinessLogoUrl,
+        businessCategory: resolvedBusinessCategory,
+        id: loc.id,
+        addressLine1: loc.addressLine1,
+        addressLine2: loc.addressLine2,
+        city: loc.city,
+        state: loc.state,
+        pincode: loc.pincode,
+        landmark: loc.landmark,
+        contactNumber: loc.contactNumber ?? "",
+        shopImageUrl: loc.shopImageUrl ?? "",
+        ...(loc.geo ? { geo: loc.geo } : {}),
+        ...(loc.businessHours ? { businessHours: loc.businessHours } : {}),
+        isPrimary,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (!existingIds.has(loc.id)) {
+        locationPayload.createdAt = FieldValue.serverTimestamp();
+      }
+
+      if (isPrimary && resolvedPrimaryShopImage) {
+        locationPayload.primaryShopImage = resolvedPrimaryShopImage;
+      }
+
+      batch.set(locRef, locationPayload, { merge: true });
+    }
+
+    await batch.commit();
+  }
 
   return NextResponse.json(
     {

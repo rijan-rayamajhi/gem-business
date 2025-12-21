@@ -548,42 +548,41 @@ export default function RegisterLocationPage() {
         </div>
 
         <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
-          {(() => {
-            const selected = primaryLocation;
-            const preview = selected ? shopImagePreviewUrlsByLocationId[selected.id] : "";
-            const imageUrl = preview || selected?.shopImageUrl || "";
-            const title = selected?.landmark?.trim() || "Primary location";
-            const subtitleParts = [selected?.city, selected?.state].filter(Boolean);
-            const subtitle = subtitleParts.join(", ");
+          {businessType !== "online" &&
+            (() => {
+              const selected = primaryLocation;
+              const preview = selected ? shopImagePreviewUrlsByLocationId[selected.id] : "";
+              const imageUrl = preview || selected?.shopImageUrl || "";
+              const title = selected?.landmark?.trim() || "Primary location";
+              const subtitleParts = [selected?.city, selected?.state].filter(Boolean);
+              const subtitle = subtitleParts.join(", ");
 
-            return (
-              <div className="mb-5">
-                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-zinc-100">
-                  {imageUrl ? (
-                    <Image
-                      src={imageUrl}
-                      alt="Shop image"
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, 768px"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-                    <div className="text-sm font-semibold tracking-tight text-white">
-                      {title}
-                    </div>
-                    <div className="mt-1 text-xs text-zinc-200">
-                      {subtitle || "Upload a shop image for this location"}
+              return (
+                <div className="mb-5">
+                  <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-zinc-100">
+                    {imageUrl ? (
+                      <Image
+                        src={imageUrl}
+                        alt="Shop image"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 768px"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
+                      <div className="text-sm font-semibold tracking-tight text-white">{title}</div>
+                      <div className="mt-1 text-xs text-zinc-200">
+                        {subtitle || (needsShopImage ? "Upload a shop image for this location" : "")}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
           <div className="grid gap-2">
             <div>
               <div className="text-lg font-semibold tracking-tight">Business location</div>
@@ -726,47 +725,51 @@ export default function RegisterLocationPage() {
                           aria-hidden={isCollapsed}
                         >
                           <div className="grid gap-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm font-medium">Shop image</div>
-                              <label className="relative inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50">
-                                Upload
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="absolute h-px w-px opacity-0"
-                                  onChange={(e) => {
-                                    const nextFile = e.target.files?.[0] ?? null;
-                                    setShopImageFilesByLocationId((prev) => ({
-                                      ...prev,
-                                      [loc.id]: nextFile,
-                                    }));
-                                    setSubmitState({ status: "idle" });
-                                  }}
-                                />
-                              </label>
-                            </div>
+                            {needsShopImage ? (
+                              <>
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-sm font-medium">Shop image</div>
+                                  <label className="relative inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50">
+                                    Upload
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="absolute h-px w-px opacity-0"
+                                      onChange={(e) => {
+                                        const nextFile = e.target.files?.[0] ?? null;
+                                        setShopImageFilesByLocationId((prev) => ({
+                                          ...prev,
+                                          [loc.id]: nextFile,
+                                        }));
+                                        setSubmitState({ status: "idle" });
+                                      }}
+                                    />
+                                  </label>
+                                </div>
 
-                            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60">
-                              <div className="relative aspect-video w-full bg-zinc-100">
-                                {effectiveImageUrl ? (
-                                  <Image
-                                    src={effectiveImageUrl}
-                                    alt="Shop image preview"
-                                    fill
-                                    className="object-cover"
-                                    sizes="(max-width: 768px) 100vw, 768px"
-                                    unoptimized
-                                  />
-                                ) : (
-                                  <div className="absolute inset-0 grid place-items-center bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10 text-xs font-semibold text-zinc-600">
-                                    16:9 shop image
+                                <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60">
+                                  <div className="relative aspect-video w-full bg-zinc-100">
+                                    {effectiveImageUrl ? (
+                                      <Image
+                                        src={effectiveImageUrl}
+                                        alt="Shop image preview"
+                                        fill
+                                        className="object-cover"
+                                        sizes="(max-width: 768px) 100vw, 768px"
+                                        unoptimized
+                                      />
+                                    ) : (
+                                      <div className="absolute inset-0 grid place-items-center bg-gradient-to-tr from-zinc-950/10 via-zinc-700/5 to-zinc-200/10 text-xs font-semibold text-zinc-600">
+                                        16:9 shop image
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-xs text-zinc-500">
-                              This image is saved for this specific location.
-                            </div>
+                                </div>
+                                <div className="text-xs text-zinc-500">
+                                  This image is saved for this specific location.
+                                </div>
+                              </>
+                            ) : null}
                           </div>
 
                           <div className="grid gap-2">
@@ -973,101 +976,52 @@ export default function RegisterLocationPage() {
                               </button>
                             </div>
 
-                            <div className="grid gap-2">
-                              <label className="text-sm font-medium" htmlFor={`${loc.id}-timezone`}>
-                                Timezone
-                              </label>
-                              <input
-                                id={`${loc.id}-timezone`}
-                                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
-                                value={hours.timezone}
-                                onChange={(e) => {
-                                  const next = { ...hours, timezone: e.target.value };
-                                  setLocations((prev) =>
-                                    prev.map((item) =>
-                                      item.id === loc.id ? { ...item, businessHours: next } : item
-                                    )
-                                  );
-                                  setSubmitState({ status: "idle" });
-                                }}
-                                placeholder="Asia/Kathmandu"
-                              />
-                            </div>
+                            {hours.enabled && (
+                              <>
+                                <div className="grid gap-2">
+                                  <label className="text-sm font-medium" htmlFor={`${loc.id}-timezone`}>
+                                    Timezone
+                                  </label>
+                                  <input
+                                    id={`${loc.id}-timezone`}
+                                    className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
+                                    value={hours.timezone}
+                                    onChange={(e) => {
+                                      const next = { ...hours, timezone: e.target.value };
+                                      setLocations((prev) =>
+                                        prev.map((item) =>
+                                          item.id === loc.id ? { ...item, businessHours: next } : item
+                                        )
+                                      );
+                                      setSubmitState({ status: "idle" });
+                                    }}
+                                    placeholder="Asia/Kathmandu"
+                                  />
+                                </div>
 
-                            <div className="grid gap-2 sm:gap-3">
-                              {DAY_LABELS.map(({ key, label }) => {
-                                const day = hours.days[key];
-                                return (
-                                  <div
-                                    key={key}
-                                    className="grid gap-2 border-b border-zinc-900/10 py-3 last:border-b-0"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                                      <div className="text-sm font-semibold">{label}</div>
-                                      <button
-                                        type="button"
-                                        className={`inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-semibold shadow-sm transition sm:h-9 ${
-                                          day.open
-                                            ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                                        }`}
-                                        onClick={() => {
-                                          const next = {
-                                            ...hours,
-                                            days: {
-                                              ...hours.days,
-                                              [key]: { ...day, open: !day.open },
-                                            },
-                                          };
-                                          setLocations((prev) =>
-                                            prev.map((item) =>
-                                              item.id === loc.id ? { ...item, businessHours: next } : item
-                                            )
-                                          );
-                                          setSubmitState({ status: "idle" });
-                                        }}
+                                <div className="grid gap-2 sm:gap-3">
+                                  {DAY_LABELS.map(({ key, label }) => {
+                                    const day = hours.days[key];
+                                    return (
+                                      <div
+                                        key={key}
+                                        className="grid gap-2 border-b border-zinc-900/10 py-3 last:border-b-0"
                                       >
-                                        {day.open ? "Open" : "Closed"}
-                                      </button>
-                                    </div>
-
-                                    {day.open ? (
-                                      <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                                        <div className="grid gap-1">
-                                          <div className="text-xs font-medium text-zinc-600">From</div>
-                                          <input
-                                            type="time"
-                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
-                                            value={day.from}
-                                            onChange={(e) => {
+                                        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                                          <div className="text-sm font-semibold">{label}</div>
+                                          <button
+                                            type="button"
+                                            className={`inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-semibold shadow-sm transition sm:h-9 ${
+                                              day.open
+                                                ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                                                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                                            }`}
+                                            onClick={() => {
                                               const next = {
                                                 ...hours,
                                                 days: {
                                                   ...hours.days,
-                                                  [key]: { ...day, from: e.target.value },
-                                                },
-                                              };
-                                              setLocations((prev) =>
-                                                prev.map((item) =>
-                                                  item.id === loc.id ? { ...item, businessHours: next } : item
-                                                )
-                                              );
-                                              setSubmitState({ status: "idle" });
-                                            }}
-                                          />
-                                        </div>
-                                        <div className="grid gap-1">
-                                          <div className="text-xs font-medium text-zinc-600">To</div>
-                                          <input
-                                            type="time"
-                                            className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
-                                            value={day.to}
-                                            onChange={(e) => {
-                                              const next = {
-                                                ...hours,
-                                                days: {
-                                                  ...hours.days,
-                                                  [key]: { ...day, to: e.target.value },
+                                                  [key]: { ...day, open: !day.open },
                                                 },
                                               };
                                               setLocations((prev) =>
@@ -1079,16 +1033,73 @@ export default function RegisterLocationPage() {
                                               );
                                               setSubmitState({ status: "idle" });
                                             }}
-                                          />
+                                          >
+                                            {day.open ? "Open" : "Closed"}
+                                          </button>
                                         </div>
+
+                                        {day.open ? (
+                                          <div className="grid min-w-0 gap-2 sm:grid-cols-2 sm:gap-3">
+                                            <div className="grid min-w-0 gap-1">
+                                              <div className="text-xs font-medium text-zinc-600">From</div>
+                                              <input
+                                                type="time"
+                                                className="h-10 w-full min-w-0 max-w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
+                                                value={day.from}
+                                                onChange={(e) => {
+                                                  const next = {
+                                                    ...hours,
+                                                    days: {
+                                                      ...hours.days,
+                                                      [key]: { ...day, from: e.target.value },
+                                                    },
+                                                  };
+                                                  setLocations((prev) =>
+                                                    prev.map((item) =>
+                                                      item.id === loc.id
+                                                        ? { ...item, businessHours: next }
+                                                        : item
+                                                    )
+                                                  );
+                                                  setSubmitState({ status: "idle" });
+                                                }}
+                                              />
+                                            </div>
+                                            <div className="grid min-w-0 gap-1">
+                                              <div className="text-xs font-medium text-zinc-600">To</div>
+                                              <input
+                                                type="time"
+                                                className="h-10 w-full min-w-0 max-w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
+                                                value={day.to}
+                                                onChange={(e) => {
+                                                  const next = {
+                                                    ...hours,
+                                                    days: {
+                                                      ...hours.days,
+                                                      [key]: { ...day, to: e.target.value },
+                                                    },
+                                                  };
+                                                  setLocations((prev) =>
+                                                    prev.map((item) =>
+                                                      item.id === loc.id
+                                                        ? { ...item, businessHours: next }
+                                                        : item
+                                                    )
+                                                  );
+                                                  setSubmitState({ status: "idle" });
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="text-xs text-zinc-500">Closed</div>
+                                        )}
                                       </div>
-                                    ) : (
-                                      <div className="text-xs text-zinc-500">Closed</div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

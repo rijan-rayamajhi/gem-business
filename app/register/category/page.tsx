@@ -53,7 +53,6 @@ const VEHICLE_CATEGORIES = new Set<BusinessCategory>([
   "Key Maker Shop",
   "Puncture Shop",
   "Towing Van",
-  "Others",
 ]);
 
 const VEHICLE_TYPES = [
@@ -69,22 +68,25 @@ const SHOP_TYPES = ["authorised shop", "local shop"] as const;
 
 type ShopType = (typeof SHOP_TYPES)[number];
 
-const BRANDS = [
-  { id: "amaron", name: "Amaron" },
-  { id: "exide", name: "Exide" },
-  { id: "bosch", name: "Bosch" },
-  { id: "castrol", name: "Castrol" },
-  { id: "mobil", name: "Mobil" },
-  { id: "shell", name: "Shell" },
-  { id: "bridgestone", name: "Bridgestone" },
-  { id: "michelin", name: "Michelin" },
-  { id: "mrf", name: "MRF" },
-  { id: "ceat", name: "CEAT" },
-  { id: "goodyear", name: "Goodyear" },
-  { id: "others", name: "Other" },
-] as const;
+type BrandItem = {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  category?: string;
+  vehicleType?: VehicleType;
+};
 
-type BrandId = (typeof BRANDS)[number]["id"];
+type BrandsState =
+  | { status: "idle"; items: BrandItem[] }
+  | { status: "loading"; items: BrandItem[] }
+  | { status: "error"; items: BrandItem[] };
+
+const AUTOMOTIVE_BRAND_CATEGORIES = new Set<BusinessCategory>([
+  "Battery Shop",
+  "Lubricants Shop",
+  "Spare parts shop",
+  "Tyre Shop",
+]);
 
 export default function RegisterCategoryPage() {
   const router = useRouter();
@@ -92,7 +94,9 @@ export default function RegisterCategoryPage() {
   const [otherCategoryName, setOtherCategoryName] = useState("");
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [shopType, setShopType] = useState<ShopType | "">("");
-  const [brands, setBrands] = useState<BrandId[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [brandVehicleTypeFilter, setBrandVehicleTypeFilter] = useState<VehicleType | "all">("all");
+  const [brandsState, setBrandsState] = useState<BrandsState>({ status: "idle", items: [] });
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -107,7 +111,7 @@ export default function RegisterCategoryPage() {
     if (!businessCategory) errors.businessCategory = "Please select your business category.";
 
     if (businessCategory === "Others" && !otherCategoryName.trim()) {
-      errors.otherCategoryName = "Please enter category name.";
+      errors.otherCategoryName = "Please select a brand to auto-fill category name.";
     }
 
     if (businessCategory && needsVehicleTypes && vehicleTypes.length === 0) {
@@ -136,6 +140,100 @@ export default function RegisterCategoryPage() {
   }, [fieldErrors]);
 
   const canSubmit = submitState.status !== "submitting" && !validationError;
+
+  const isAutomotiveCategory = useMemo(() => {
+    if (!businessCategory) return false;
+    return AUTOMOTIVE_BRAND_CATEGORIES.has(businessCategory);
+  }, [businessCategory]);
+
+  useEffect(() => {
+    if (!businessCategory || needsVehicleTypes || !shopType) return;
+
+    const token = (() => {
+      try {
+        return sessionStorage.getItem("gem_id_token");
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!token) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const run = async () => {
+      setBrandsState((prev) => ({ status: "loading", items: prev.items }));
+
+      const url = (() => {
+        if (businessCategory === "Machanic Shop") {
+          return "/api/brands?source=vehicleBrands";
+        }
+
+        if (isAutomotiveCategory) {
+          return "/api/brands?source=brands&category=" +
+            encodeURIComponent("Automotive & Accessories");
+        }
+
+        return "/api/brands?source=brands";
+      })();
+
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+
+        const data = (await res.json().catch(() => null)) as
+          | { ok?: boolean; brands?: unknown }
+          | null;
+
+        if (!res.ok || !data?.ok || !Array.isArray(data.brands)) {
+          setBrandsState((prev) => ({ status: "error", items: prev.items }));
+          return;
+        }
+
+        const items = data.brands
+          .filter((b) => b && typeof b === "object")
+          .map((b) => {
+            const obj = b as Record<string, unknown>;
+            const id = typeof obj.id === "string" ? obj.id : "";
+            const name = typeof obj.name === "string" ? obj.name : "";
+            const logoUrl = typeof obj.logoUrl === "string" ? obj.logoUrl : "";
+            const category = typeof obj.category === "string" ? obj.category : "";
+            const vehicleType = typeof obj.vehicleType === "string" ? obj.vehicleType : "";
+            return {
+              id,
+              name,
+              ...(logoUrl ? { logoUrl } : {}),
+              ...(category ? { category } : {}),
+              ...((VEHICLE_TYPES as readonly string[]).includes(vehicleType)
+                ? { vehicleType: vehicleType as VehicleType }
+                : {}),
+            } satisfies BrandItem;
+          })
+          .filter((b) => Boolean(b.id) && Boolean(b.name))
+          .filter((b) =>
+            businessCategory === "Others" ? b.category !== "Automotive & Accessories" : true
+          );
+
+        setBrandsState({ status: "idle", items });
+      } catch {
+        setBrandsState((prev) => ({ status: "error", items: prev.items }));
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, [businessCategory, isAutomotiveCategory, needsVehicleTypes, shopType]);
+
+  const filteredBrands = useMemo(() => {
+    if (businessCategory !== "Machanic Shop") return brandsState.items;
+    if (brandVehicleTypeFilter === "all") return brandsState.items;
+    return brandsState.items.filter((b) => b.vehicleType === brandVehicleTypeFilter);
+  }, [brandVehicleTypeFilter, brandsState.items, businessCategory]);
 
   useEffect(() => {
     const token = (() => {
@@ -188,7 +286,7 @@ export default function RegisterCategoryPage() {
           ? (data.business.vehicleTypes as VehicleType[])
           : [];
         const nextBrands = Array.isArray(data.business.brands)
-          ? (data.business.brands as BrandId[])
+          ? (data.business.brands.filter((value) => typeof value === "string") as string[])
           : [];
 
         setBusinessCategory(
@@ -204,13 +302,7 @@ export default function RegisterCategoryPage() {
             (VEHICLE_TYPES as readonly string[]).includes(value)
           )
         );
-        setBrands(
-          nextBrands.filter((value) =>
-            (BRANDS as readonly { id: string; name: string }[]).some(
-              (brand) => brand.id === value
-            )
-          )
-        );
+        setBrands(nextBrands);
       } catch {
         // ignore
       }
@@ -340,10 +432,12 @@ export default function RegisterCategoryPage() {
                           checked={active}
                           onChange={() => {
                             setBusinessCategory(category);
-                            if (category !== "Others") setOtherCategoryName("");
+                            setOtherCategoryName("");
                             setVehicleTypes([]);
                             setShopType("");
                             setBrands([]);
+                            setBrandsState({ status: "idle", items: [] });
+                            setBrandVehicleTypeFilter("all");
                             setTouched((prev) => ({ ...prev, businessCategory: true }));
                             setSubmitState({ status: "idle" });
                           }}
@@ -367,18 +461,17 @@ export default function RegisterCategoryPage() {
                   <label className="text-sm font-medium" htmlFor="otherCategoryName">
                     Category name
                   </label>
-                  <input
+                  <div
                     id="otherCategoryName"
-                    className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                    value={otherCategoryName}
-                    onChange={(e) => {
-                      setOtherCategoryName(e.target.value);
-                      setTouched((prev) => ({ ...prev, otherCategoryName: true }));
-                      setSubmitState({ status: "idle" });
-                    }}
-                    onBlur={() => setTouched((prev) => ({ ...prev, otherCategoryName: true }))}
-                    placeholder="Enter your category"
-                  />
+                    className="flex h-11 w-full items-center rounded-xl border border-zinc-900/10 bg-white px-3 text-sm text-zinc-900 shadow-sm"
+                    role="status"
+                  >
+                    {otherCategoryName.trim() ? (
+                      <span className="truncate font-semibold">{otherCategoryName}</span>
+                    ) : (
+                      <span className="truncate text-zinc-500">Select a brand to auto-fill</span>
+                    )}
+                  </div>
                   {touched.otherCategoryName && fieldErrors.otherCategoryName && (
                     <div className="text-xs text-rose-600">{fieldErrors.otherCategoryName}</div>
                   )}
@@ -423,6 +516,10 @@ export default function RegisterCategoryPage() {
                       );
                     })}
                   </div>
+
+                  {businessCategory === "Machanic Shop" && filteredBrands.length === 0 && (
+                    <div className="text-xs text-zinc-500">No brands found for this filter.</div>
+                  )}
                   {touched.vehicleTypes && fieldErrors.vehicleTypes && (
                     <div className="text-xs text-rose-600">{fieldErrors.vehicleTypes}</div>
                   )}
@@ -452,6 +549,7 @@ export default function RegisterCategoryPage() {
                             onChange={() => {
                               setShopType(type);
                               setBrands([]);
+                              setBrandsState({ status: "idle", items: [] });
                               setTouched((prev) => ({ ...prev, shopType: true }));
                               setSubmitState({ status: "idle" });
                             }}
@@ -482,8 +580,47 @@ export default function RegisterCategoryPage() {
                     </div>
                   </div>
 
+                  {businessCategory === "Machanic Shop" && (
+                    <div className="grid gap-2">
+                      <div className="text-sm font-medium">Filter by vehicle category</div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <button
+                          type="button"
+                          className={`h-10 rounded-xl border px-3 text-sm font-medium transition ${
+                            brandVehicleTypeFilter === "all"
+                              ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
+                              : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
+                          }`}
+                          onClick={() => setBrandVehicleTypeFilter("all")}
+                        >
+                          All
+                        </button>
+                        {VEHICLE_TYPES.map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`h-10 rounded-xl border px-3 text-sm font-medium transition ${
+                              brandVehicleTypeFilter === type
+                                ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
+                                : "border-zinc-900/10 bg-white/60 text-zinc-900 hover:bg-white/80"
+                            }`}
+                            onClick={() => setBrandVehicleTypeFilter(type)}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(brandsState.status === "loading" || brandsState.status === "error") && (
+                    <div className="text-xs text-zinc-500">
+                      {brandsState.status === "loading" ? "Loading brands…" : "Failed to load brands."}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {BRANDS.map((brand) => {
+                    {filteredBrands.map((brand) => {
                       const active = brands.includes(brand.id);
                       const limitReached = shopType === "local shop" && !active && brands.length >= 5;
                       const disabled = shopType === "local shop" ? limitReached : false;
@@ -502,12 +639,27 @@ export default function RegisterCategoryPage() {
                           }`}
                           aria-disabled={disabled}
                         >
-                          <span
-                            className="grid h-14 w-14 place-items-center rounded-3xl border border-zinc-900/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm"
-                            aria-hidden="true"
-                          >
-                            {brand.name.slice(0, 2).toUpperCase()}
-                          </span>
+                          {brand.logoUrl ? (
+                            <span
+                              className="grid h-14 w-14 place-items-center overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-sm"
+                              aria-hidden="true"
+                            >
+                              <img
+                                src={brand.logoUrl}
+                                alt={brand.name}
+                                className="h-full w-full object-contain"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            </span>
+                          ) : (
+                            <span
+                              className="grid h-14 w-14 place-items-center rounded-3xl border border-zinc-900/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm"
+                              aria-hidden="true"
+                            >
+                              {brand.name.slice(0, 2).toUpperCase()}
+                            </span>
+                          )}
                           <span className="w-full truncate text-xs font-semibold leading-tight">
                             {brand.name}
                           </span>
@@ -519,6 +671,12 @@ export default function RegisterCategoryPage() {
                             onChange={() => {
                               setSubmitState({ status: "idle" });
                               setTouched((prev) => ({ ...prev, brands: true }));
+
+                              if (businessCategory === "Others") {
+                                const nextCategoryName = (brand.category || brand.name).trim();
+                                setOtherCategoryName(nextCategoryName);
+                                setTouched((prev) => ({ ...prev, otherCategoryName: true }));
+                              }
 
                               if (shopType === "authorised shop") {
                                 setBrands([brand.id]);
