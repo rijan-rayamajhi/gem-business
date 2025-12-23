@@ -20,19 +20,17 @@ function formatDateTime(value: string) {
 
 export default function DashboardEventPage() {
   const [open, setOpen] = useState(false);
-  const [events, setEvents] = useState<EventDraft[]>([]);
-
-  useEffect(() => {
+  const [events, setEvents] = useState<EventDraft[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+      if (!raw) return [];
       const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return;
-      setEvents(parsed as EventDraft[]);
+      if (!Array.isArray(parsed)) return [];
+      return parsed as EventDraft[];
     } catch {
-      // ignore
+      return [];
     }
-  }, []);
+  });
 
   useEffect(() => {
     try {

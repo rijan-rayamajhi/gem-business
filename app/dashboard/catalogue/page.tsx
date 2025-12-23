@@ -25,11 +25,6 @@ function CatalogueCard(props: { item: CatalogueItem; onOpen: (id: string) => voi
   const cover = images[index] ?? images[0] ?? "";
   const hasCarousel = images.length > 1;
 
-  useEffect(() => {
-    setIndex(0);
-    setFailedUrls(new Set());
-  }, [item.id]);
-
   return (
     <div
       role="button"
@@ -159,10 +154,7 @@ export default function DashboardCataloguePage() {
       }
     })();
 
-    if (!token) {
-      setLoadState({ status: "error", message: "Missing authentication token." });
-      return;
-    }
+    if (!token) return;
 
     const controller = new AbortController();
     const run = async () => {
@@ -221,6 +213,14 @@ export default function DashboardCataloguePage() {
     return () => controller.abort();
   }, [filter]);
 
+  const showMissingToken = useMemo(() => {
+    try {
+      return !sessionStorage.getItem("gem_id_token");
+    } catch {
+      return true;
+    }
+  }, []);
+
   const filteredItems = useMemo(() => {
     if (filter === "all") return items;
     return items.filter((it) => it.status === filter);
@@ -271,6 +271,12 @@ export default function DashboardCataloguePage() {
           </select>
         </div>
       </div>
+
+      {showMissingToken ? (
+        <div className="mt-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 shadow-sm">
+          Missing authentication token.
+        </div>
+      ) : null}
 
       {loadState.status === "loading" ? (
         <div className="mt-6 rounded-2xl border border-zinc-900/10 bg-white/60 px-4 py-3 text-sm text-zinc-600 shadow-sm">
@@ -339,7 +345,7 @@ export default function DashboardCataloguePage() {
         {filteredItems.map((item) => {
           return (
             <CatalogueCard
-              key={item.id}
+              key={`${item.id}_${item.imageUrls?.length ?? 0}_${item.status ?? ""}`}
               item={item}
               onOpen={(id) => router.push(`/dashboard/catalogue/${encodeURIComponent(id)}`)}
             />

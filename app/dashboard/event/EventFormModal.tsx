@@ -2,6 +2,38 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
+type GoogleMapsApi = {
+  maps?: {
+    places?: {
+      Autocomplete: new (
+        input: HTMLInputElement,
+        opts: { fields: string[] }
+      ) => {
+        addListener: (eventName: string, handler: () => void) => unknown;
+        getPlace: () => Record<string, unknown>;
+      };
+    };
+    Map: new (
+      el: HTMLElement,
+      opts: {
+        center: { lat: number; lng: number };
+        zoom: number;
+        disableDefaultUI: boolean;
+        zoomControl: boolean;
+      }
+    ) => {
+      setCenter: (center: { lat: number; lng: number }) => void;
+      setZoom: (zoom: number) => void;
+    };
+    Marker: new (opts: { position: { lat: number; lng: number }; map: unknown }) => {
+      setPosition: (center: { lat: number; lng: number }) => void;
+    };
+    event: {
+      removeListener: (listener: unknown) => void;
+    };
+  };
+};
+
 type EventDraft = {
   id: string;
   title: string;
@@ -59,7 +91,7 @@ function useGoogleMapsScript(apiKey?: string | null) {
 
   useEffect(() => {
     if (!apiKey) {
-      setStatus("error");
+      queueMicrotask(() => setStatus("error"));
       return;
     }
 
@@ -67,13 +99,14 @@ function useGoogleMapsScript(apiKey?: string | null) {
       'script[data-gem-google-maps="true"]'
     );
 
-    if ((window as any).google?.maps?.places) {
-      setStatus("ready");
+    const googleApi = (window as unknown as { google?: GoogleMapsApi }).google;
+    if (googleApi?.maps?.places) {
+      queueMicrotask(() => setStatus("ready"));
       return;
     }
 
     if (existing) {
-      setStatus("loading");
+      queueMicrotask(() => setStatus("loading"));
       const onLoad = () => setStatus("ready");
       const onError = () => setStatus("error");
       existing.addEventListener("load", onLoad);
@@ -84,7 +117,7 @@ function useGoogleMapsScript(apiKey?: string | null) {
       };
     }
 
-    setStatus("loading");
+    queueMicrotask(() => setStatus("loading"));
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       apiKey
@@ -116,30 +149,50 @@ function LocationPicker({
   const status = useGoogleMapsScript(apiKey);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const markerRef = useRef<any>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<{ setPosition: (center: { lat: number; lng: number }) => void } | null>(
+    null
+  );
+  const mapInstanceRef = useRef<{
+    setCenter: (center: { lat: number; lng: number }) => void;
+    setZoom: (zoom: number) => void;
+  } | null>(null);
 
   useEffect(() => {
     if (status !== "ready") return;
 
-    const googleAny = (window as any).google as any;
+    const googleAny = (window as unknown as { google?: GoogleMapsApi }).google;
     const input = inputRef.current;
-    if (!googleAny?.maps?.places || !input) return;
+    const maps = googleAny?.maps;
+    if (!maps?.places || !input) return;
 
-    const autocomplete = new googleAny.maps.places.Autocomplete(input, {
+    const autocomplete = new maps.places.Autocomplete(input, {
       fields: ["place_id", "formatted_address", "geometry", "name"],
     });
 
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-      const address =
-        place?.formatted_address || place?.name || input.value || value.address;
-      const lat = place?.geometry?.location?.lat?.();
-      const lng = place?.geometry?.location?.lng?.();
+      const placeObj = place && typeof place === "object" ? (place as Record<string, unknown>) : {};
+      const formattedAddress =
+        typeof placeObj.formatted_address === "string" ? placeObj.formatted_address : "";
+      const name = typeof placeObj.name === "string" ? placeObj.name : "";
+      const geometry =
+        placeObj.geometry && typeof placeObj.geometry === "object"
+          ? (placeObj.geometry as Record<string, unknown>)
+          : null;
+      const location =
+        geometry && typeof geometry.location === "object" && geometry.location
+          ? (geometry.location as Record<string, unknown>)
+          : null;
+      const latFn = location?.lat;
+      const lngFn = location?.lng;
+      const lat = typeof latFn === "function" ? (latFn as () => unknown)() : undefined;
+      const lng = typeof lngFn === "function" ? (lngFn as () => unknown)() : undefined;
+
+      const address = formattedAddress || name || input.value || value.address;
 
       onChange({
         address,
-        placeId: place?.place_id,
+        placeId: typeof placeObj.place_id === "string" ? placeObj.place_id : undefined,
         lat: typeof lat === "number" ? lat : undefined,
         lng: typeof lng === "number" ? lng : undefined,
       });
@@ -147,7 +200,7 @@ function LocationPicker({
       if (typeof lat === "number" && typeof lng === "number") {
         const center = { lat, lng };
         if (!mapInstanceRef.current && mapRef.current) {
-          mapInstanceRef.current = new googleAny.maps.Map(mapRef.current, {
+          mapInstanceRef.current = new maps.Map(mapRef.current, {
             center,
             zoom: 14,
             disableDefaultUI: true,
@@ -159,7 +212,7 @@ function LocationPicker({
         }
 
         if (!markerRef.current && mapInstanceRef.current) {
-          markerRef.current = new googleAny.maps.Marker({
+          markerRef.current = new maps.Marker({
             position: center,
             map: mapInstanceRef.current,
           });
@@ -170,21 +223,22 @@ function LocationPicker({
     });
 
     return () => {
-      if (listener) googleAny.maps.event.removeListener(listener);
+      if (listener) maps.event.removeListener(listener);
     };
   }, [onChange, status, value.address]);
 
   useEffect(() => {
     if (status !== "ready") return;
-    const googleAny = (window as any).google as any;
-    if (!googleAny?.maps || !mapRef.current) return;
+    const googleAny = (window as unknown as { google?: GoogleMapsApi }).google;
+    const maps = googleAny?.maps;
+    if (!maps || !mapRef.current) return;
 
     if (typeof value.lat !== "number" || typeof value.lng !== "number") return;
 
     const center = { lat: value.lat, lng: value.lng };
 
     if (!mapInstanceRef.current) {
-      mapInstanceRef.current = new googleAny.maps.Map(mapRef.current, {
+      mapInstanceRef.current = new maps.Map(mapRef.current, {
         center,
         zoom: 14,
         disableDefaultUI: true,
@@ -196,7 +250,7 @@ function LocationPicker({
     }
 
     if (!markerRef.current && mapInstanceRef.current) {
-      markerRef.current = new googleAny.maps.Marker({
+      markerRef.current = new maps.Marker({
         position: center,
         map: mapInstanceRef.current,
       });
