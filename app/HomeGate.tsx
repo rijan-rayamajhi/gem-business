@@ -88,7 +88,7 @@ export default function HomeGate({ children }: Props) {
         if (data?.ok) {
           const status = asBusinessStatus(data.businessStatus);
           if (status === "verified") {
-            router.replace("/dashboard");
+            router.replace("/dashboard/catalogue");
             return;
           }
           if (status === "submitted" || status === "pending") {

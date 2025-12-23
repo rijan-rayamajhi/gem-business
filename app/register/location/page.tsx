@@ -24,12 +24,8 @@ type SubmitState =
 
 type BusinessLocation = {
   id: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  landmark: string;
+  fullAddress: string;
+  geo: { lat: number; lng: number } | null;
   contactNumber: string;
   shopImageUrl?: string;
   businessHours?: unknown;
@@ -54,44 +50,69 @@ declare global {
   }
 }
 
-type GoogleAddressComponent = { long_name: string; short_name: string; types: string[] };
-type GooglePlaceResult = {
-  address_components?: GoogleAddressComponent[];
-  formatted_address?: string;
-  name?: string;
+type GoogleLatLngLiteral = { lat: number; lng: number };
+
+type GoogleLatLngObject = {
+  lat: () => number;
+  lng: () => number;
 };
 
-type GoogleAutocompleteInstance = {
-  addListener: (eventName: string, handler: () => void) => void;
-  getPlace?: () => GooglePlaceResult;
+type GoogleMapClickEvent = {
+  latLng?: GoogleLatLngObject;
 };
 
-type GoogleMapsPlaces = {
-  Autocomplete: new (
-    node: HTMLInputElement,
-    opts: { fields: string[]; types: string[] }
-  ) => GoogleAutocompleteInstance;
+type GoogleMapInstance = {
+  addListener?: (eventName: string, handler: (event: GoogleMapClickEvent) => void) => void;
+  setCenter?: (latlng: GoogleLatLngLiteral) => void;
 };
 
-type GoogleMapsEvent = {
-  clearInstanceListeners?: (instance: unknown) => void;
-};
-
-type GoogleMaps = {
-  places?: GoogleMapsPlaces;
-  event?: GoogleMapsEvent;
+type GoogleMarkerInstance = {
+  addListener?: (eventName: string, handler: () => void) => void;
+  getPosition?: () => GoogleLatLngObject | null;
+  setPosition?: (latlng: GoogleLatLngLiteral) => void;
 };
 
 type GoogleApi = {
-  maps?: GoogleMaps;
+  maps?: {
+    Map: new (node: HTMLElement, opts: Record<string, unknown>) => GoogleMapInstance;
+    Marker: new (opts: Record<string, unknown>) => GoogleMarkerInstance;
+    Geocoder: new () => { geocode: (req: Record<string, unknown>) => Promise<unknown> };
+    event?: { clearInstanceListeners?: (instance: unknown) => void };
+  };
 };
+
+function extractLatLngFromUnknown(value: unknown): GoogleLatLngLiteral | null {
+  if (!value || typeof value !== "object") return null;
+  const rec = value as Record<string, unknown>;
+
+  const lat =
+    typeof rec.lat === "number"
+      ? rec.lat
+      : typeof rec.latitude === "number"
+        ? rec.latitude
+        : typeof rec._latitude === "number"
+          ? rec._latitude
+          : null;
+  const lng =
+    typeof rec.lng === "number"
+      ? rec.lng
+      : typeof rec.longitude === "number"
+        ? rec.longitude
+        : typeof rec._longitude === "number"
+          ? rec._longitude
+          : null;
+
+  if (lat === null || lng === null) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
 
 let googleMapsScriptPromise: Promise<void> | null = null;
 
 function loadGoogleMapsScript(apiKey: string) {
   if (typeof window === "undefined") return Promise.resolve();
   const google = window.google as GoogleApi | undefined;
-  if (google?.maps?.places) return Promise.resolve();
+  if (google?.maps?.Map) return Promise.resolve();
 
   if (googleMapsScriptPromise) return googleMapsScriptPromise;
 
@@ -109,7 +130,7 @@ function loadGoogleMapsScript(apiKey: string) {
     script.dataset.gemGoogleMaps = "true";
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       apiKey
-    )}&libraries=places`;
+    )}`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
@@ -118,15 +139,6 @@ function loadGoogleMapsScript(apiKey: string) {
   });
 
   return googleMapsScriptPromise;
-}
-
-function pickAddressComponent(
-  components: Array<{ long_name: string; short_name: string; types: string[] }> | undefined,
-  type: string
-) {
-  if (!components) return "";
-  const found = components.find((c) => c.types.includes(type));
-  return found?.long_name ?? "";
 }
 
 function makeId() {
@@ -139,12 +151,8 @@ function makeId() {
 function createEmptyLocation(): BusinessLocation {
   return {
     id: makeId(),
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    pincode: "",
-    landmark: "",
+    fullAddress: "",
+    geo: null,
     contactNumber: "",
     shopImageUrl: "",
     businessHours: null,
@@ -194,7 +202,16 @@ export default function RegisterLocationPage() {
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
   const [googleReady, setGoogleReady] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const autocompleteByIdRef = useRef<Record<string, unknown>>({});
+  const mapNodeByIdRef = useRef<Record<string, HTMLDivElement | null>>({});
+  const mapInstanceByIdRef = useRef<Record<string, GoogleMapInstance>>({});
+  const markerByIdRef = useRef<Record<string, GoogleMarkerInstance>>({});
+  const geocoderRef = useRef<unknown>(null);
+  const browserGeoPromiseRef = useRef<Promise<GoogleLatLngLiteral | null> | null>(null);
+
+  const [geoLocateStatusByLocationId, setGeoLocateStatusByLocationId] = useState<
+    Record<string, "idle" | "loading" | "error">
+  >({});
+  const [geoLocateErrorByLocationId, setGeoLocateErrorByLocationId] = useState<Record<string, string>>({});
 
   const [businessType, setBusinessType] = useState<"online" | "offline" | "both" | "">("");
   const [locations, setLocations] = useState<BusinessLocation[]>([createEmptyLocation()]);
@@ -240,7 +257,7 @@ export default function RegisterLocationPage() {
       .then(() => {
         if (cancelled) return;
         const google = window.google as GoogleApi | undefined;
-        if (!google?.maps?.places) {
+        if (!google?.maps?.Map) {
           setGoogleError("Google Maps is unavailable.");
           setGoogleReady(false);
           return;
@@ -259,65 +276,154 @@ export default function RegisterLocationPage() {
     };
   }, [googleMapsKey]);
 
-  useEffect(() => {
-    const existingIds = new Set(locations.map((loc) => loc.id));
-    for (const [id, instance] of Object.entries(autocompleteByIdRef.current)) {
-      if (existingIds.has(id)) continue;
-      try {
-        const google = window.google as GoogleApi | undefined;
-        google?.maps?.event?.clearInstanceListeners?.(instance);
-      } catch {
-        // ignore
+  async function getBrowserGeoOnce(): Promise<GoogleLatLngLiteral | null> {
+    if (browserGeoPromiseRef.current) return browserGeoPromiseRef.current;
+    browserGeoPromiseRef.current = new Promise<GoogleLatLngLiteral | null>((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
       }
-      delete autocompleteByIdRef.current[id];
-    }
-  }, [locations]);
 
-  function attachAutocomplete(node: HTMLInputElement | null, locationId: string) {
-    if (!node) return;
-    if (!googleReady) return;
-    if (autocompleteByIdRef.current[locationId]) return;
-    const google = window.google as GoogleApi | undefined;
-    if (!google?.maps?.places?.Autocomplete) return;
-
-    const instance = new google.maps.places.Autocomplete(node, {
-      fields: ["address_components", "formatted_address", "name"],
-      types: ["geocode"],
-    });
-
-    instance.addListener("place_changed", () => {
-      const place = instance.getPlace?.();
-      const components = place?.address_components;
-
-      const city =
-        pickAddressComponent(components, "locality") ||
-        pickAddressComponent(components, "postal_town") ||
-        pickAddressComponent(components, "administrative_area_level_2");
-      const state = pickAddressComponent(components, "administrative_area_level_1");
-      const pincode = pickAddressComponent(components, "postal_code");
-
-      const formattedAddress =
-        typeof place?.formatted_address === "string" ? place.formatted_address : "";
-      const name = typeof place?.name === "string" ? place.name : "";
-
-      setLocations((prev) =>
-        prev.map((loc) => {
-          if (loc.id !== locationId) return loc;
-          return {
-            ...loc,
-            addressLine1: formattedAddress || loc.addressLine1,
-            city: city || loc.city,
-            state: state || loc.state,
-            pincode: pincode || loc.pincode,
-            landmark: loc.landmark || name,
-          };
-        })
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000 }
       );
-      setSubmitState({ status: "idle" });
     });
 
-    autocompleteByIdRef.current[locationId] = instance;
+    return browserGeoPromiseRef.current;
   }
+
+  async function reverseGeocode(latlng: GoogleLatLngLiteral): Promise<string> {
+    if (!googleReady) return "";
+    const google = window.google as GoogleApi | undefined;
+    if (!google?.maps?.Geocoder) return "";
+
+    const geocoder = (geocoderRef.current ?? new google.maps.Geocoder()) as {
+      geocode: (req: Record<string, unknown>) => Promise<unknown>;
+    };
+    geocoderRef.current = geocoder;
+
+    const res = (await geocoder
+      .geocode({ location: latlng })
+      .catch(() => null)) as { results?: Array<{ formatted_address?: string }> } | null;
+
+    const formatted = res?.results?.[0]?.formatted_address;
+    return typeof formatted === "string" ? formatted : "";
+  }
+
+  async function setLocationFromLatLng(locationId: string, latlng: GoogleLatLngLiteral) {
+    const address = await reverseGeocode(latlng);
+    setLocations((prev) =>
+      prev.map((loc) =>
+        loc.id === locationId
+          ? {
+              ...loc,
+              geo: latlng,
+              fullAddress: address || loc.fullAddress,
+            }
+          : loc
+      )
+    );
+    setSubmitState({ status: "idle" });
+  }
+
+  function ensureMapForLocation(locationId: string) {
+    if (!googleReady) return;
+    const node = mapNodeByIdRef.current[locationId];
+    if (!node) return;
+    if (mapInstanceByIdRef.current[locationId]) return;
+
+    const google = window.google as GoogleApi | undefined;
+    if (!google?.maps?.Map || !google?.maps?.Marker) return;
+
+    const loc = locations.find((l) => l.id === locationId);
+    const center = loc?.geo ?? { lat: 27.7172, lng: 85.324 };
+
+    const map = new google.maps.Map(node, {
+      center,
+      zoom: loc?.geo ? 16 : 12,
+      disableDefaultUI: true,
+      clickableIcons: false,
+    });
+
+    const marker = new google.maps.Marker({
+      map,
+      position: center,
+      draggable: true,
+    });
+
+    map.addListener?.("click", async (event) => {
+      const latLng = event.latLng;
+      if (!latLng) return;
+      const lat = latLng.lat();
+      const lng = latLng.lng();
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      marker.setPosition?.({ lat, lng });
+      await setLocationFromLatLng(locationId, { lat, lng });
+    });
+
+    marker.addListener?.("dragend", async () => {
+      const pos = marker.getPosition?.();
+      if (!pos) return;
+      const lat = pos.lat();
+      const lng = pos.lng();
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      await setLocationFromLatLng(locationId, { lat, lng });
+    });
+
+    mapInstanceByIdRef.current[locationId] = map;
+    markerByIdRef.current[locationId] = marker;
+  }
+
+  useEffect(() => {
+    if (!googleReady) return;
+
+    const existingIds = new Set(locations.map((loc) => loc.id));
+    for (const id of Object.keys(mapInstanceByIdRef.current)) {
+      if (existingIds.has(id)) continue;
+      delete mapInstanceByIdRef.current[id];
+      delete markerByIdRef.current[id];
+      delete mapNodeByIdRef.current[id];
+    }
+
+    for (const loc of locations) {
+      ensureMapForLocation(loc.id);
+    }
+  }, [googleReady, locations]);
+
+  useEffect(() => {
+    if (!googleReady) return;
+
+    for (const loc of locations) {
+      const marker = markerByIdRef.current[loc.id];
+      const map = mapInstanceByIdRef.current[loc.id];
+      if (!marker || !map) continue;
+      if (!loc.geo) continue;
+      marker.setPosition?.(loc.geo);
+      map.setCenter?.(loc.geo);
+    }
+  }, [googleReady, locations]);
+
+  useEffect(() => {
+    if (!googleReady) return;
+
+    void (async () => {
+      const base = await getBrowserGeoOnce();
+      if (!base) return;
+
+      for (const loc of locations) {
+        if (loc.geo) continue;
+        await setLocationFromLatLng(loc.id, base);
+        const marker = markerByIdRef.current[loc.id];
+        const map = mapInstanceByIdRef.current[loc.id];
+        marker?.setPosition?.(base);
+        map?.setCenter?.(base);
+      }
+    })();
+  }, [googleReady, locations]);
 
   const primaryLocation = useMemo(() => {
     return locations.find((loc) => loc.id === primaryLocationId) ?? locations[0] ?? null;
@@ -328,10 +434,7 @@ export default function RegisterLocationPage() {
     if (!locations.length) return "Please add at least one business location.";
 
     for (const [index, loc] of locations.entries()) {
-      if (!loc.addressLine1.trim()) return `Location ${index + 1}: Please enter address.`;
-      if (!loc.city.trim()) return `Location ${index + 1}: Please enter city.`;
-      if (!loc.state.trim()) return `Location ${index + 1}: Please enter state.`;
-      if (!loc.pincode.trim()) return `Location ${index + 1}: Please enter pincode.`;
+      if (!loc.geo) return `Location ${index + 1}: Please pin your location on the map.`;
     }
 
     if (!primaryLocationId) return "Please select a primary location.";
@@ -384,7 +487,7 @@ export default function RegisterLocationPage() {
           return;
         }
         if (status === "verified") {
-          router.replace("/dashboard");
+          router.replace("/dashboard/catalogue");
           return;
         }
         if (status === "rejected") {
@@ -409,14 +512,11 @@ export default function RegisterLocationPage() {
             nextLocations.map((loc) => {
               const record = loc as unknown as Record<string, unknown>;
               const hours = record.businessHours;
+              const fullAddressRaw = typeof record.fullAddress === "string" ? record.fullAddress : "";
               return {
                 id: typeof loc.id === "string" && loc.id ? loc.id : makeId(),
-                addressLine1: typeof loc.addressLine1 === "string" ? loc.addressLine1 : "",
-                addressLine2: typeof loc.addressLine2 === "string" ? loc.addressLine2 : "",
-                city: typeof loc.city === "string" ? loc.city : "",
-                state: typeof loc.state === "string" ? loc.state : "",
-                pincode: typeof loc.pincode === "string" ? loc.pincode : "",
-                landmark: typeof loc.landmark === "string" ? loc.landmark : "",
+                fullAddress: fullAddressRaw,
+                geo: extractLatLngFromUnknown(record.geo),
                 contactNumber:
                   typeof record.contactNumber === "string" ? record.contactNumber : "",
                 shopImageUrl: typeof record.shopImageUrl === "string" ? record.shopImageUrl : "",
@@ -553,9 +653,8 @@ export default function RegisterLocationPage() {
               const selected = primaryLocation;
               const preview = selected ? shopImagePreviewUrlsByLocationId[selected.id] : "";
               const imageUrl = preview || selected?.shopImageUrl || "";
-              const title = selected?.landmark?.trim() || "Primary location";
-              const subtitleParts = [selected?.city, selected?.state].filter(Boolean);
-              const subtitle = subtitleParts.join(", ");
+              const title = "Primary location";
+              const subtitle = selected?.fullAddress?.trim() || "";
 
               return (
                 <div className="mb-5">
@@ -626,6 +725,8 @@ export default function RegisterLocationPage() {
                     const hours = (loc.businessHours && typeof loc.businessHours === "object"
                       ? (loc.businessHours as BusinessHours)
                       : null) ?? createDefaultBusinessHours();
+                    const geoLocateStatus = geoLocateStatusByLocationId[loc.id] ?? "idle";
+                    const geoLocateError = geoLocateErrorByLocationId[loc.id] ?? "";
                     return (
                       <div
                         key={loc.id}
@@ -773,153 +874,62 @@ export default function RegisterLocationPage() {
                           </div>
 
                           <div className="grid gap-2">
-                            <label className="text-sm font-medium" htmlFor={`${loc.id}-gsearch`}>
-                              Search on Google Maps
-                            </label>
-                            <input
-                              id={`${loc.id}-gsearch`}
-                              ref={(node) => attachAutocomplete(node, loc.id)}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              placeholder={
-                                googleMapsKey
-                                  ? "Start typing an address…"
-                                  : "Google Maps not configured — enter address manually"
-                              }
-                              disabled={!googleMapsKey || Boolean(googleError)}
-                              onChange={() => {
-                                setSubmitState({ status: "idle" });
-                              }}
-                            />
-                            {googleError && (
-                              <div className="text-xs text-rose-600">
-                                {googleError}
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm font-medium">Location on Google Maps</div>
+                              <button
+                                type="button"
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:px-4 sm:text-sm"
+                                disabled={geoLocateStatus === "loading"}
+                                onClick={() => {
+                                  void (async () => {
+                                    setGeoLocateStatusByLocationId((prev) => ({ ...prev, [loc.id]: "loading" }));
+                                    setGeoLocateErrorByLocationId((prev) => {
+                                      const next = { ...prev };
+                                      delete next[loc.id];
+                                      return next;
+                                    });
+
+                                    const base = await getBrowserGeoOnce();
+                                    if (!base) {
+                                      setGeoLocateStatusByLocationId((prev) => ({ ...prev, [loc.id]: "error" }));
+                                      setGeoLocateErrorByLocationId((prev) => ({
+                                        ...prev,
+                                        [loc.id]: "Unable to access your current location. Please allow location permission and try again.",
+                                      }));
+                                      return;
+                                    }
+
+                                    await setLocationFromLatLng(loc.id, base);
+                                    const marker = markerByIdRef.current[loc.id];
+                                    const map = mapInstanceByIdRef.current[loc.id];
+                                    marker?.setPosition?.(base);
+                                    map?.setCenter?.(base);
+                                    setGeoLocateStatusByLocationId((prev) => ({ ...prev, [loc.id]: "idle" }));
+                                  })();
+                                }}
+                              >
+                                {geoLocateStatus === "loading" ? "Locating…" : "Use current location"}
+                              </button>
+                            </div>
+                            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white/60">
+                              <div
+                                className="h-64 w-full bg-zinc-100"
+                                ref={(node) => {
+                                  mapNodeByIdRef.current[loc.id] = node;
+                                }}
+                              />
+                            </div>
+                            {googleError ? (
+                              <div className="text-xs text-rose-600">{googleError}</div>
+                            ) : geoLocateError ? (
+                              <div className="text-xs text-rose-600">{geoLocateError}</div>
+                            ) : (
+                              <div className="text-xs text-zinc-600">
+                                {loc.fullAddress?.trim()
+                                  ? loc.fullAddress
+                                  : "Move the pin to select your address."}
                               </div>
                             )}
-                          </div>
-
-                          <div className="grid gap-2">
-                            <label className="text-sm font-medium" htmlFor={`${loc.id}-address1`}>
-                              Address line 1
-                            </label>
-                            <input
-                              id={`${loc.id}-address1`}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                              value={loc.addressLine1}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setLocations((prev) =>
-                                  prev.map((item) =>
-                                    item.id === loc.id ? { ...item, addressLine1: value } : item
-                                  )
-                                );
-                                setSubmitState({ status: "idle" });
-                              }}
-                              placeholder="Street / area"
-                            />
-                          </div>
-
-                          <div className="grid gap-2">
-                            <label className="text-sm font-medium" htmlFor={`${loc.id}-address2`}>
-                              Address line 2
-                            </label>
-                            <input
-                              id={`${loc.id}-address2`}
-                              className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                              value={loc.addressLine2}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setLocations((prev) =>
-                                  prev.map((item) =>
-                                    item.id === loc.id ? { ...item, addressLine2: value } : item
-                                  )
-                                );
-                                setSubmitState({ status: "idle" });
-                              }}
-                              placeholder="Building / floor (optional)"
-                            />
-                          </div>
-
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="grid gap-2">
-                              <label className="text-sm font-medium" htmlFor={`${loc.id}-city`}>
-                                City
-                              </label>
-                              <input
-                                id={`${loc.id}-city`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                                value={loc.city}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setLocations((prev) =>
-                                    prev.map((item) =>
-                                      item.id === loc.id ? { ...item, city: value } : item
-                                    )
-                                  );
-                                  setSubmitState({ status: "idle" });
-                                }}
-                              />
-                            </div>
-
-                            <div className="grid gap-2">
-                              <label className="text-sm font-medium" htmlFor={`${loc.id}-state`}>
-                                State
-                              </label>
-                              <input
-                                id={`${loc.id}-state`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                                value={loc.state}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setLocations((prev) =>
-                                    prev.map((item) =>
-                                      item.id === loc.id ? { ...item, state: value } : item
-                                    )
-                                  );
-                                  setSubmitState({ status: "idle" });
-                                }}
-                              />
-                            </div>
-
-                            <div className="grid gap-2">
-                              <label className="text-sm font-medium" htmlFor={`${loc.id}-pincode`}>
-                                Pincode
-                              </label>
-                              <input
-                                id={`${loc.id}-pincode`}
-                                inputMode="numeric"
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                                value={loc.pincode}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setLocations((prev) =>
-                                    prev.map((item) =>
-                                      item.id === loc.id ? { ...item, pincode: value } : item
-                                    )
-                                  );
-                                  setSubmitState({ status: "idle" });
-                                }}
-                              />
-                            </div>
-
-                            <div className="grid gap-2">
-                              <label className="text-sm font-medium" htmlFor={`${loc.id}-landmark`}>
-                                Landmark
-                              </label>
-                              <input
-                                id={`${loc.id}-landmark`}
-                                className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                                value={loc.landmark}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setLocations((prev) =>
-                                    prev.map((item) =>
-                                      item.id === loc.id ? { ...item, landmark: value } : item
-                                    )
-                                  );
-                                  setSubmitState({ status: "idle" });
-                                }}
-                              />
-                            </div>
                           </div>
 
                           <div className="grid gap-2">
@@ -978,27 +988,6 @@ export default function RegisterLocationPage() {
 
                             {hours.enabled && (
                               <>
-                                <div className="grid gap-2">
-                                  <label className="text-sm font-medium" htmlFor={`${loc.id}-timezone`}>
-                                    Timezone
-                                  </label>
-                                  <input
-                                    id={`${loc.id}-timezone`}
-                                    className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none ring-0 transition focus:border-zinc-900/20 focus:bg-zinc-50 sm:h-11"
-                                    value={hours.timezone}
-                                    onChange={(e) => {
-                                      const next = { ...hours, timezone: e.target.value };
-                                      setLocations((prev) =>
-                                        prev.map((item) =>
-                                          item.id === loc.id ? { ...item, businessHours: next } : item
-                                        )
-                                      );
-                                      setSubmitState({ status: "idle" });
-                                    }}
-                                    placeholder="Asia/Kathmandu"
-                                  />
-                                </div>
-
                                 <div className="grid gap-2 sm:gap-3">
                                   {DAY_LABELS.map(({ key, label }) => {
                                     const day = hours.days[key];

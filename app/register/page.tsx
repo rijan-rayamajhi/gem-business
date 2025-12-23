@@ -180,7 +180,7 @@ export default function RegisterPage() {
           return;
         }
         if (status === "verified") {
-          router.replace("/dashboard");
+          router.replace("/dashboard/catalogue");
           return;
         }
         if (status === "rejected") {

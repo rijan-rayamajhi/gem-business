@@ -78,7 +78,7 @@ export default function RegisterRejectedPage() {
 
         const status = asBusinessStatus(data.business?.status);
         if (status === "verified") {
-          router.replace("/dashboard");
+          router.replace("/dashboard/catalogue");
           return;
         }
         if (status === "submitted" || status === "pending") {

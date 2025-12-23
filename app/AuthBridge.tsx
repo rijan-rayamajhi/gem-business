@@ -9,6 +9,19 @@ type GemAuthMessage = {
 
 export default function AuthBridge() {
   useEffect(() => {
+    const isDevBypassEnabled =
+      process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "1";
+
+    if (isDevBypassEnabled) {
+      const token = process.env.NEXT_PUBLIC_DEV_BYPASS_TOKEN?.trim() || "dev";
+      try {
+        sessionStorage.setItem("gem_id_token", token);
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new Event("gem-auth"));
+    }
+
     const handler = (event: MessageEvent) => {
       const raw = event.data;
 

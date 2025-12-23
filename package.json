@@ -11,6 +11,10 @@
   "dependencies": {
     "firebase-admin": "^12.7.0",
     "iconsax-react": "^0.0.8",
+    "@tiptap/core": "^2.2.4",
+    "@tiptap/extension-underline": "^2.2.4",
+    "@tiptap/react": "^2.2.4",
+    "@tiptap/starter-kit": "^2.2.4",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1"

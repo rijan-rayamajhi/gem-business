@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GeoPoint } from "firebase-admin/firestore";
-import { FieldValue, adminAuth, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
+import { FieldValue, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
+import { getUid } from "@/lib/requestAuth";
 
 export const runtime = "nodejs";
 
@@ -89,12 +90,7 @@ function isValidUrl(value: string) {
 
 type BusinessLocation = {
   id: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  landmark: string;
+  fullAddress: string;
   contactNumber?: string;
   shopImageUrl?: string;
   geo?: GeoPoint;
@@ -142,12 +138,7 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
     const obj = item as Record<string, unknown>;
 
     const id = isNonEmptyString(obj.id) ? obj.id.trim() : "";
-    const addressLine1 = typeof obj.addressLine1 === "string" ? obj.addressLine1.trim() : "";
-    const addressLine2 = typeof obj.addressLine2 === "string" ? obj.addressLine2.trim() : "";
-    const city = typeof obj.city === "string" ? obj.city.trim() : "";
-    const state = typeof obj.state === "string" ? obj.state.trim() : "";
-    const pincode = typeof obj.pincode === "string" ? obj.pincode.trim() : "";
-    const landmark = typeof obj.landmark === "string" ? obj.landmark.trim() : "";
+    const fullAddress = typeof obj.fullAddress === "string" ? obj.fullAddress.trim() : "";
     const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber.trim() : "";
     const shopImageUrlRaw = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl.trim() : "";
     const shopImageUrl = shopImageUrlRaw && isValidUrl(shopImageUrlRaw) ? shopImageUrlRaw : "";
@@ -167,12 +158,7 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
 
     locations.push({
       id,
-      addressLine1,
-      addressLine2,
-      city,
-      state,
-      pincode,
-      landmark,
+      fullAddress,
       ...(contactNumber ? { contactNumber } : {}),
       ...(shopImageUrl ? { shopImageUrl } : {}),
       ...(geo ? { geo } : {}),
@@ -181,36 +167,6 @@ function normalizeBusinessLocations(value: unknown): BusinessLocation[] {
   }
 
   return locations;
-}
-
-async function getUid(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, message: "Missing authentication token." },
-        { status: 401 }
-      ),
-    };
-  }
-
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    return { ok: true as const, uid: decoded.uid };
-  } catch {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, message: "Invalid authentication token." },
-        { status: 401 }
-      ),
-    };
-  }
 }
 
 export async function GET(request: Request) {
@@ -243,6 +199,7 @@ export async function GET(request: Request) {
       const obj = value as Record<string, unknown>;
       const shopImageUrl = typeof obj.shopImageUrl === "string" ? obj.shopImageUrl : "";
       const contactNumber = typeof obj.contactNumber === "string" ? obj.contactNumber : "";
+      const fullAddress = typeof obj.fullAddress === "string" ? obj.fullAddress : "";
       const businessHours = obj.businessHours ?? null;
       const geo = (() => {
         const maybeGeo = obj.geo;
@@ -266,12 +223,7 @@ export async function GET(request: Request) {
 
       return {
         id: typeof obj.id === "string" ? obj.id : "",
-        addressLine1: typeof obj.addressLine1 === "string" ? obj.addressLine1 : "",
-        addressLine2: typeof obj.addressLine2 === "string" ? obj.addressLine2 : "",
-        city: typeof obj.city === "string" ? obj.city : "",
-        state: typeof obj.state === "string" ? obj.state : "",
-        pincode: typeof obj.pincode === "string" ? obj.pincode : "",
-        landmark: typeof obj.landmark === "string" ? obj.landmark : "",
+        fullAddress,
         ...(contactNumber ? { contactNumber } : {}),
         ...(shopImageUrl ? { shopImageUrl } : {}),
         ...(geo ? { geo } : {}),
@@ -646,27 +598,9 @@ export async function POST(request: Request) {
       );
     }
     for (const loc of businessLocations) {
-      if (!loc.addressLine1) {
+      if (!loc.geo) {
         return NextResponse.json(
-          { ok: false, message: "Please enter address for each location." },
-          { status: 400 }
-        );
-      }
-      if (!loc.city) {
-        return NextResponse.json(
-          { ok: false, message: "Please enter city for each location." },
-          { status: 400 }
-        );
-      }
-      if (!loc.state) {
-        return NextResponse.json(
-          { ok: false, message: "Please enter state for each location." },
-          { status: 400 }
-        );
-      }
-      if (!loc.pincode) {
-        return NextResponse.json(
-          { ok: false, message: "Please enter pincode for each location." },
+          { ok: false, message: "Please pin your location on the map." },
           { status: 400 }
         );
       }
@@ -849,12 +783,7 @@ export async function POST(request: Request) {
         businessLogoUrl: resolvedBusinessLogoUrl,
         businessCategory: resolvedBusinessCategory,
         id: loc.id,
-        addressLine1: loc.addressLine1,
-        addressLine2: loc.addressLine2,
-        city: loc.city,
-        state: loc.state,
-        pincode: loc.pincode,
-        landmark: loc.landmark,
+        fullAddress: loc.fullAddress,
         contactNumber: loc.contactNumber ?? "",
         shopImageUrl: loc.shopImageUrl ?? "",
         ...(loc.geo ? { geo: loc.geo } : {}),

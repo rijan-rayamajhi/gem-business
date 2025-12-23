@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { adminDb } from "@/lib/firebaseAdmin";
+import { getUid } from "@/lib/requestAuth";
 
 export const runtime = "nodejs";
 
@@ -16,28 +17,10 @@ function isBusinessStatus(value: unknown): value is BusinessStatus {
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
+  const auth = await getUid(request);
+  if (!auth.ok) return auth.response;
 
-  if (!token) {
-    return NextResponse.json(
-      { ok: false, message: "Missing authentication token." },
-      { status: 401 }
-    );
-  }
-
-  let uid: string;
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    uid = decoded.uid;
-  } catch {
-    return NextResponse.json(
-      { ok: false, message: "Invalid authentication token." },
-      { status: 401 }
-    );
-  }
+  const uid = auth.uid;
 
   const businessSnap = await adminDb.collection("business").doc(uid).get();
   const statusRaw = businessSnap.exists ? (businessSnap.data()?.status as unknown) : null;

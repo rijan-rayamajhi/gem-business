@@ -7,12 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type BusinessLocation = {
   id: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  landmark: string;
+  fullAddress: string;
+  geo?: { lat: number; lng: number } | null;
   contactNumber?: string;
   shopImageUrl?: string;
   businessHours?: unknown;
@@ -70,10 +66,7 @@ function asBusinessStatus(value: unknown): BusinessStatus | null {
 }
 
 function formatAddress(loc: BusinessLocation) {
-  const parts = [loc.addressLine1, loc.addressLine2, loc.landmark, loc.city, loc.state, loc.pincode]
-    .map((v) => (typeof v === "string" ? v.trim() : ""))
-    .filter(Boolean);
-  return parts.join(", ");
+  return typeof loc.fullAddress === "string" ? loc.fullAddress.trim() : "";
 }
 
 export default function RegisterPreviewPage() {
@@ -267,7 +260,7 @@ export default function RegisterPreviewPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
                     <div className="text-sm font-semibold tracking-tight text-white">
-                      {primaryLocation?.landmark?.trim() || "Primary location"}
+                      {primaryLocation?.fullAddress?.trim() || "Primary location"}
                     </div>
                     <div className="mt-1 text-xs text-zinc-200">
                       {primaryLocation ? formatAddress(primaryLocation) : "Add a location to continue"}

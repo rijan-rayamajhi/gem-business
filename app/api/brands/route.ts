@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { adminDb } from "@/lib/firebaseAdmin";
+import { getUid } from "@/lib/requestAuth";
 
 export const runtime = "nodejs";
 
@@ -20,28 +21,6 @@ function asVehicleType(value: unknown): VehicleType | null {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
-}
-
-async function getUid(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
-
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, message: "Missing authentication token." }, { status: 401 }),
-    };
-  }
-
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    return { ok: true as const, uid: decoded.uid };
-  } catch {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ ok: false, message: "Invalid authentication token." }, { status: 401 }),
-    };
-  }
 }
 
 export async function GET(request: Request) {

@@ -5,12 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type BusinessLocation = {
   id: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  pincode: string;
-  landmark: string;
+  fullAddress: string;
+  geo?: { lat: number; lng: number } | null;
   shopImageUrl?: string;
   contactNumber?: string;
 };
@@ -121,7 +117,7 @@ export default function RegisterKycPage() {
 
         const status = asBusinessStatus(data.business.status);
         if (status === "verified") {
-          router.replace("/dashboard");
+          router.replace("/dashboard/catalogue");
           return;
         }
         if (status === "rejected") {
@@ -184,9 +180,27 @@ export default function RegisterKycPage() {
 
     const durationSeconds = target.type === "selfie" ? 15 : 30;
 
+    const preferredMimeType = (() => {
+      const candidates = [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+        "video/mp4",
+      ];
+      for (const mt of candidates) {
+        if (MediaRecorder.isTypeSupported(mt)) return mt;
+      }
+      return "";
+    })();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: target.type === "selfie" ? "user" : "environment" },
+        video: {
+          facingMode: target.type === "selfie" ? "user" : "environment",
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 24, max: 30 },
+        },
         audio: true,
       });
 
@@ -194,9 +208,9 @@ export default function RegisterKycPage() {
 
       chunksRef.current = [];
       const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm",
+        ...(preferredMimeType ? { mimeType: preferredMimeType } : {}),
+        videoBitsPerSecond: target.type === "selfie" ? 900_000 : 1_200_000,
+        audioBitsPerSecond: 64_000,
       });
 
       recorder.ondataavailable = (event) => {
@@ -436,10 +450,7 @@ export default function RegisterKycPage() {
 
                 <div className="mt-4 grid gap-3">
                   {state.locations.map((loc, index) => {
-                    const label =
-                      loc.landmark?.trim() ||
-                      [loc.city, loc.state].filter(Boolean).join(", ") ||
-                      `Location ${index + 1}`;
+                    const label = loc.fullAddress?.trim() || `Location ${index + 1}`;
                     return (
                       <div
                         key={loc.id}

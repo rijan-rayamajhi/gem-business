@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type BusinessStatus = "draft" | "submitted" | "pending" | "verified" | "rejected";
 
@@ -100,10 +100,172 @@ export default function RegisterCategoryPage() {
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastUserScrollAtRef = useRef(0);
+  const pendingScrollRafRef = useRef<number | null>(null);
+
+  const otherCategorySectionRef = useRef<HTMLDivElement | null>(null);
+  const vehicleTypeSectionRef = useRef<HTMLDivElement | null>(null);
+  const shopTypeSectionRef = useRef<HTMLDivElement | null>(null);
+  const brandsSectionRef = useRef<HTMLDivElement | null>(null);
+  const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const markUserScroll = () => {
+      lastUserScrollAtRef.current = Date.now();
+
+      if (pendingScrollRafRef.current != null) {
+        cancelAnimationFrame(pendingScrollRafRef.current);
+        pendingScrollRafRef.current = null;
+      }
+    };
+
+    const markUserKeyScroll = (event: KeyboardEvent) => {
+      const keys = new Set([
+        "ArrowUp",
+        "ArrowDown",
+        "PageUp",
+        "PageDown",
+        "Home",
+        "End",
+        "Space",
+      ]);
+
+      if (keys.has(event.code)) {
+        markUserScroll();
+      }
+    };
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", markUserScroll, { passive: true });
+      container.addEventListener("wheel", markUserScroll, { passive: true });
+    }
+    window.addEventListener("keydown", markUserKeyScroll);
+
+    return () => {
+      if (container) {
+        container.removeEventListener("scroll", markUserScroll);
+        container.removeEventListener("wheel", markUserScroll);
+      }
+      window.removeEventListener("keydown", markUserKeyScroll);
+    };
+  }, []);
+
+  const scrollToRef = (
+    ref: React.RefObject<HTMLElement | null>,
+    options?: {
+      force?: boolean;
+    }
+  ) => {
+    const el = ref.current;
+    if (!el) return;
+
+    const force = options?.force ?? false;
+
+    if (!force && Date.now() - lastUserScrollAtRef.current < 900) return;
+
+    const container = scrollContainerRef.current;
+    const containerRect = container ? container.getBoundingClientRect() : null;
+    const rect = el.getBoundingClientRect();
+    const viewportHeight = container
+      ? container.clientHeight
+      : window.innerHeight || document.documentElement.clientHeight;
+    const scrollMargin = 120;
+    const top = containerRect ? rect.top - containerRect.top : rect.top;
+    const bottom = containerRect ? rect.bottom - containerRect.top : rect.bottom;
+    const isTooHigh = top < scrollMargin;
+    const isTooLow = bottom > viewportHeight - scrollMargin;
+
+    if (!isTooHigh && !isTooLow) return;
+
+    if (pendingScrollRafRef.current != null) {
+      cancelAnimationFrame(pendingScrollRafRef.current);
+      pendingScrollRafRef.current = null;
+    }
+
+    pendingScrollRafRef.current = requestAnimationFrame(() => {
+      pendingScrollRafRef.current = null;
+
+      const liveRect = el.getBoundingClientRect();
+      const liveContainer = scrollContainerRef.current;
+      const liveContainerRect = liveContainer ? liveContainer.getBoundingClientRect() : null;
+      const liveViewportHeight = liveContainer
+        ? liveContainer.clientHeight
+        : window.innerHeight || document.documentElement.clientHeight;
+      const liveTop = liveContainerRect ? liveRect.top - liveContainerRect.top : liveRect.top;
+      const liveBottom = liveContainerRect ? liveRect.bottom - liveContainerRect.top : liveRect.bottom;
+      const liveIsTooHigh = liveTop < scrollMargin;
+      const liveIsTooLow = liveBottom > liveViewportHeight - scrollMargin;
+      if (!liveIsTooHigh && !liveIsTooLow) return;
+
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) {
+        active.blur();
+      }
+
+      const currentScrollTop = liveContainer ? liveContainer.scrollTop : window.scrollY;
+      const targetTop = Math.max(0, currentScrollTop + liveTop - scrollMargin);
+
+      try {
+        if (liveContainer) {
+          liveContainer.scrollTop = targetTop;
+        } else {
+          const prevHtmlBehavior = document.documentElement.style.scrollBehavior;
+          const prevBodyBehavior = document.body.style.scrollBehavior;
+          document.documentElement.style.scrollBehavior = "auto";
+          document.body.style.scrollBehavior = "auto";
+          try {
+            window.scrollTo({ top: targetTop, left: 0, behavior: "auto" });
+          } finally {
+            document.documentElement.style.scrollBehavior = prevHtmlBehavior;
+            document.body.style.scrollBehavior = prevBodyBehavior;
+          }
+        }
+      } finally {
+        // noop
+      }
+    });
+  };
+
+  const lastBusinessCategoryRef = useRef<BusinessCategory | "">("");
+  const lastShopTypeRef = useRef<ShopType | "">("");
+
   const needsVehicleTypes = useMemo(() => {
     if (!businessCategory) return false;
     return VEHICLE_CATEGORIES.has(businessCategory);
   }, [businessCategory]);
+
+  useEffect(() => {
+    if (!touched.businessCategory) return;
+    if (!businessCategory) return;
+    if (lastBusinessCategoryRef.current === businessCategory) return;
+
+    lastBusinessCategoryRef.current = businessCategory;
+    lastShopTypeRef.current = "";
+
+    if (businessCategory === "Others") {
+      scrollToRef(otherCategorySectionRef, { force: true });
+      return;
+    }
+
+    if (needsVehicleTypes) {
+      scrollToRef(vehicleTypeSectionRef, { force: true });
+      return;
+    }
+
+    scrollToRef(shopTypeSectionRef, { force: true });
+  }, [businessCategory, needsVehicleTypes, touched.businessCategory]);
+
+  useEffect(() => {
+    if (!touched.shopType) return;
+    if (!businessCategory || needsVehicleTypes) return;
+    if (!shopType) return;
+    if (lastShopTypeRef.current === shopType) return;
+
+    lastShopTypeRef.current = shopType;
+    scrollToRef(brandsSectionRef, { force: true });
+  }, [businessCategory, needsVehicleTypes, shopType, touched.shopType]);
 
   const fieldErrors = useMemo(() => {
     const errors: Record<string, string> = {};
@@ -268,7 +430,7 @@ export default function RegisterCategoryPage() {
           return;
         }
         if (status === "verified") {
-          router.replace("/dashboard");
+          router.replace("/dashboard/catalogue");
           return;
         }
         if (status === "rejected") {
@@ -394,14 +556,21 @@ export default function RegisterCategoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950">
+    <div
+      ref={scrollContainerRef}
+      className="bg-zinc-50 text-zinc-950"
+      style={{ height: "100dvh", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
+    >
       <div className="relative isolate overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-zinc-950/20 via-zinc-700/10 to-zinc-200/15 blur-3xl" />
           <div className="absolute -bottom-40 right-0 h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-zinc-950/0 via-zinc-700/10 to-zinc-950/0 blur-3xl" />
         </div>
 
-        <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
+        <main
+          className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-12"
+          style={{ touchAction: "pan-y" }}
+        >
           <div className="grid gap-2">
             <div>
               <div className="text-lg font-semibold tracking-tight">Business category</div>
@@ -419,6 +588,7 @@ export default function RegisterCategoryPage() {
                     return (
                       <label
                         key={category}
+                        style={{ touchAction: "pan-y" }}
                         className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                           active
                             ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
@@ -457,7 +627,7 @@ export default function RegisterCategoryPage() {
               </div>
 
               {businessCategory === "Others" && (
-                <div className="grid gap-2">
+                <div ref={otherCategorySectionRef} className="grid gap-2">
                   <label className="text-sm font-medium" htmlFor="otherCategoryName">
                     Category name
                   </label>
@@ -479,7 +649,7 @@ export default function RegisterCategoryPage() {
               )}
 
               {businessCategory && needsVehicleTypes && (
-                <div className="grid gap-2">
+                <div ref={vehicleTypeSectionRef} className="grid gap-2">
                   <div className="text-sm font-medium">Vehicle type</div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {VEHICLE_TYPES.map((type) => {
@@ -487,6 +657,7 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={type}
+                          style={{ touchAction: "pan-y" }}
                           className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             checked
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
@@ -527,7 +698,7 @@ export default function RegisterCategoryPage() {
               )}
 
               {businessCategory && !needsVehicleTypes && (
-                <div className="grid gap-2">
+                <div ref={shopTypeSectionRef} className="grid gap-2">
                   <div className="text-sm font-medium">Shop type</div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {SHOP_TYPES.map((type) => {
@@ -535,6 +706,7 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={type}
+                          style={{ touchAction: "pan-y" }}
                           className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
                             active
                               ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
@@ -570,7 +742,7 @@ export default function RegisterCategoryPage() {
               )}
 
               {businessCategory && !needsVehicleTypes && shopType && (
-                <div className="grid gap-2">
+                <div ref={brandsSectionRef} className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-medium">Brands</div>
                     <div className="text-xs text-zinc-500">
@@ -628,6 +800,7 @@ export default function RegisterCategoryPage() {
                       return (
                         <label
                           key={brand.id}
+                          style={{ touchAction: "pan-y" }}
                           className={`relative flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition ${
                             active
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
@@ -731,6 +904,7 @@ export default function RegisterCategoryPage() {
 
               <button
                 type="submit"
+                ref={submitButtonRef}
                 className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={!canSubmit}
               >

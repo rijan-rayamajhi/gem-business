@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { FieldValue, adminAuth, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { FieldValue, adminDb, adminStorageBucket } from "@/lib/firebaseAdmin";
+import { getUid } from "@/lib/requestAuth";
 
 export const runtime = "nodejs";
 
@@ -9,51 +12,23 @@ type VerificationStatus = "pending" | "verified" | "rejected";
 
 type KycStatus = "pending" | "verified" | "rejected";
 
-async function getUid(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-
-  if (!token) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, message: "Missing authentication token." },
-        { status: 401 }
-      ),
-    };
-  }
-
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    return { ok: true as const, uid: decoded.uid };
-  } catch {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, message: "Invalid authentication token." },
-        { status: 401 }
-      ),
-    };
-  }
-}
-
 async function uploadVideoToStorage(params: { uid: string; file: File; folder: string }) {
   const { uid, file, folder } = params;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
   const safeName = (file.name || "video").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   const objectPath = `${folder}/${uid}/${Date.now()}_${safeName}`;
 
   const objectRef = adminStorageBucket.file(objectPath);
-  await objectRef.save(buffer, {
-    resumable: false,
+  const writeStream = objectRef.createWriteStream({
+    resumable: true,
     metadata: {
       contentType: file.type || "application/octet-stream",
       cacheControl: "public, max-age=31536000",
     },
   });
+
+  const webStream = file.stream();
+  await pipeline(Readable.fromWeb(webStream as unknown as Parameters<typeof Readable.fromWeb>[0]), writeStream);
 
   await objectRef.makePublic();
   const publicUrl = objectRef.publicUrl();
