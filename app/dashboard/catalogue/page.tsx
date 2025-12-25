@@ -143,6 +143,10 @@ export default function DashboardCataloguePage() {
     | { status: "error"; message: string }
   >({ status: "idle" });
 
+  const [tokenCheck, setTokenCheck] = useState<{ status: "checking" } | { status: "ready"; token: string | null }>(
+    { status: "checking" }
+  );
+
   const [filter, setFilter] = useState<"all" | CatalogueStatus>("all");
 
   useEffect(() => {
@@ -154,6 +158,14 @@ export default function DashboardCataloguePage() {
       }
     })();
 
+    setTokenCheck({ status: "ready", token });
+  }, []);
+
+  const showMissingToken = tokenCheck.status === "ready" && !tokenCheck.token;
+
+  useEffect(() => {
+    if (tokenCheck.status !== "ready") return;
+    const token = tokenCheck.token;
     if (!token) return;
 
     const controller = new AbortController();
@@ -211,15 +223,7 @@ export default function DashboardCataloguePage() {
 
     void run();
     return () => controller.abort();
-  }, [filter]);
-
-  const showMissingToken = useMemo(() => {
-    try {
-      return !sessionStorage.getItem("gem_id_token");
-    } catch {
-      return true;
-    }
-  }, []);
+  }, [filter, tokenCheck]);
 
   const filteredItems = useMemo(() => {
     if (filter === "all") return items;
@@ -271,6 +275,12 @@ export default function DashboardCataloguePage() {
           </select>
         </div>
       </div>
+
+      {tokenCheck.status === "checking" ? (
+        <div className="mt-6 rounded-2xl border border-zinc-900/10 bg-white/60 px-4 py-3 text-sm text-zinc-600 shadow-sm">
+          Loading…
+        </div>
+      ) : null}
 
       {showMissingToken ? (
         <div className="mt-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 shadow-sm">

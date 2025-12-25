@@ -56,9 +56,10 @@ type EventDraft = {
 type LocationValue = EventDraft["location"];
 
 type Props = {
-  open: boolean;
+  open?: boolean;
   onClose: () => void;
   onCreate: (event: EventDraft) => void;
+  variant?: "modal" | "page";
 };
 
 type FieldErrors = Partial<Record<keyof Omit<EventDraft, "id" | "location" | "tags">, string>> & {
@@ -461,7 +462,7 @@ function TagsInput({
   );
 }
 
-export default function EventFormModal({ open, onClose, onCreate }: Props) {
+export default function EventFormModal({ open, onClose, onCreate, variant = "modal" }: Props) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -483,23 +484,25 @@ export default function EventFormModal({ open, onClose, onCreate }: Props) {
 
   const titleRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const t = window.setTimeout(() => titleRef.current?.focus(), 50);
-    return () => window.clearTimeout(t);
-  }, [open]);
+  const active = variant === "modal" ? Boolean(open) : true;
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
+    const t = window.setTimeout(() => titleRef.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, [active]);
+
+  useEffect(() => {
+    if (variant !== "modal" || !open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
+  }, [open, variant]);
 
   useEffect(() => {
-    if (!open) return;
+    if (variant !== "modal" || !open) return;
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -507,7 +510,7 @@ export default function EventFormModal({ open, onClose, onCreate }: Props) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, open]);
+  }, [onClose, open, variant]);
 
   const errors = useMemo((): FieldErrors => {
     const next: FieldErrors = {};
@@ -609,44 +612,17 @@ export default function EventFormModal({ open, onClose, onCreate }: Props) {
     }
   }
 
-  if (!open) return null;
+  if (variant === "modal" && !open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100]">
-      <button
-        type="button"
-        aria-label="Close"
-        className="absolute inset-0 bg-zinc-950/45"
-        onClick={onClose}
-      />
-
-      <div className="absolute inset-0 flex items-end justify-center sm:items-center sm:p-6">
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="w-full overflow-hidden rounded-t-3xl border border-zinc-900/10 bg-white shadow-xl sm:max-w-2xl sm:rounded-3xl"
-        >
-          <div className="flex items-center justify-between gap-3 border-b border-zinc-900/10 px-5 py-4">
-            <div>
-              <div className="text-base font-semibold tracking-tight">Create event</div>
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Fill details to publish later.
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
-
-          <form
-            className="max-h-[82vh] overflow-x-hidden overflow-y-auto px-5 py-5"
-            onSubmit={onSubmit}
-          >
+  const form = (
+    <form
+      className={
+        variant === "modal"
+          ? "max-h-[82vh] overflow-x-hidden overflow-y-auto px-5 py-5"
+          : "px-5 py-5"
+      }
+      onSubmit={onSubmit}
+    >
             <div className="grid gap-5">
               <div className="grid gap-2">
                 <label className="text-sm font-medium" htmlFor="eventTitle">
@@ -873,7 +849,69 @@ export default function EventFormModal({ open, onClose, onCreate }: Props) {
                 You can edit and publish later.
               </div>
             </div>
-          </form>
+    </form>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+        <div className="overflow-hidden rounded-3xl border border-zinc-900/10 bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-zinc-900/10 px-5 py-4">
+            <div>
+              <div className="text-base font-semibold tracking-tight">Create event</div>
+              <div className="mt-0.5 text-xs text-zinc-500">
+                Fill details to publish later.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+
+          {form}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100]">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-zinc-950/45"
+        onClick={onClose}
+      />
+
+      <div className="absolute inset-0 flex items-end justify-center">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="w-full overflow-hidden rounded-t-3xl border border-zinc-900/10 bg-white shadow-xl"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-zinc-900/10 px-5 py-4">
+            <div>
+              <div className="text-base font-semibold tracking-tight">Create event</div>
+              <div className="mt-0.5 text-xs text-zinc-500">
+                Fill details to publish later.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+
+          {form}
         </div>
       </div>
     </div>

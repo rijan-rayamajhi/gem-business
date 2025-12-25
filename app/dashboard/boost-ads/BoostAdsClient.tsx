@@ -23,13 +23,8 @@ export default function BoostAdsClient() {
   const searchParams = useSearchParams();
   const catalogueId = searchParams.get("catalogueId") ?? "";
 
-  const token = useMemo(() => {
-    try {
-      return sessionStorage.getItem("gem_id_token");
-    } catch {
-      return null;
-    }
-  }, []);
+  const [token, setToken] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   const [item, setItem] = useState<CatalogueItem | null>(null);
   const [loadState, setLoadState] = useState<
@@ -38,11 +33,27 @@ export default function BoostAdsClient() {
     | { status: "error"; message: string }
   >(() => {
     if (!catalogueId) return { status: "error", message: "Missing catalogue id." };
-    if (!token) return { status: "error", message: "Missing authentication token." };
     return { status: "idle" };
   });
 
-  const [adsType, setAdsType] = useState<AdsType>("carousel");
+  const [adsType, setAdsType] = useState<AdsType | null>(null);
+  const [touchedAdsType, setTouchedAdsType] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+    try {
+      setToken(sessionStorage.getItem("gem_id_token"));
+    } catch {
+      setToken(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (catalogueId && !token) {
+      setLoadState({ status: "error", message: "Missing authentication token." });
+    }
+  }, [catalogueId, hydrated, token]);
 
   useEffect(() => {
     if (!catalogueId || !token) return;
@@ -150,40 +161,69 @@ export default function BoostAdsClient() {
               <div className="text-sm font-semibold text-zinc-950">Select ads type</div>
 
               <div className="mt-3 grid gap-3">
-                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm">
-                  <input
-                    type="radio"
-                    name="adsType"
-                    value="carousel"
-                    checked={adsType === "carousel"}
-                    onChange={() => setAdsType("carousel")}
-                    className="mt-1"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-950">Carousel Ads</div>
-                    <div className="mt-0.5 text-xs text-zinc-600">
-                      Show multiple images in a swipeable carousel.
-                    </div>
-                  </div>
-                </label>
+                {([
+                  {
+                    key: "carousel" as const,
+                    title: "Carousel Ads",
+                    description: "Show multiple images in a swipeable carousel.",
+                  },
+                  {
+                    key: "scratch" as const,
+                    title: "Scratch Ads",
+                    description: "Scratch-to-reveal style promotional ad.",
+                  },
+                ] as const).map((opt) => {
+                  const active = adsType === opt.key;
+                  return (
+                    <label
+                      key={opt.key}
+                      className={
+                        "flex w-full cursor-pointer items-start justify-between gap-3 rounded-2xl border px-4 py-4 text-left text-sm font-medium transition " +
+                        (active
+                          ? "border-zinc-950/20 bg-zinc-950/5 text-zinc-950"
+                          : "border-zinc-900/10 bg-white text-zinc-900 hover:bg-zinc-50")
+                      }
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-zinc-950">{opt.title}</div>
+                        <div className="mt-0.5 text-xs text-zinc-600">{opt.description}</div>
+                      </div>
 
-                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-zinc-900/10 bg-white p-4 shadow-sm">
-                  <input
-                    type="radio"
-                    name="adsType"
-                    value="scratch"
-                    checked={adsType === "scratch"}
-                    onChange={() => setAdsType("scratch")}
-                    className="mt-1"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-950">Scratch Ads</div>
-                    <div className="mt-0.5 text-xs text-zinc-600">
-                      Scratch-to-reveal style promotional ad.
-                    </div>
-                  </div>
-                </label>
+                      <input
+                        type="radio"
+                        name="adsType"
+                        checked={active}
+                        onChange={() => {
+                          setAdsType(opt.key);
+                          setTouchedAdsType(true);
+                        }}
+                        className="peer sr-only"
+                      />
+                      <span
+                        className="relative mt-0.5 h-6 w-6 flex-none rounded-full border border-zinc-900/20 bg-white shadow-sm transition peer-checked:border-zinc-950 after:absolute after:left-1/2 after:top-1/2 after:h-3 after:w-3 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-zinc-950 after:opacity-0 after:transition peer-checked:after:opacity-100"
+                        aria-hidden="true"
+                      />
+                    </label>
+                  );
+                })}
               </div>
+
+              {touchedAdsType ? (
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900"
+                    onClick={() => {
+                      if (!catalogueId) return;
+                      if (!adsType) return;
+                      const qs = new URLSearchParams({ catalogueId, adsType });
+                      router.push(`/dashboard/boost-ads/goal?${qs.toString()}`);
+                    }}
+                  >
+                    Continue
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

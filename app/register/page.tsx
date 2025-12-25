@@ -330,22 +330,6 @@ export default function RegisterPage() {
                 Create your account and we’ll reach out with next steps for your
                 project.
               </p>
-
-              <div className="grid gap-3">
-                {[
-                  "Fast response, typically same day",
-                  "Clear next steps and timelines",
-                  "High-touch, premium support",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-start gap-2 border-b border-zinc-900/10 py-3 text-sm text-zinc-700 last:border-b-0"
-                  >
-                    <span className="mt-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <div>{item}</div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div className="relative">

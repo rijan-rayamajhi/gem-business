@@ -5,7 +5,7 @@ export default function Home() {
     name: "GEM Business",
     headline: "Fuel Your Growth with GEM Business",
     subheadline:
-      "Tap into a high-intent customer network and list your services in minutes—built to feel premium and convert on mobile.",
+      "Tap into a high-intent mobility network and list your services in minutes.",
     primaryCta: { label: "Register Now", href: "/register" },
   };
 
@@ -133,7 +133,6 @@ export default function Home() {
                 </h2>
                 <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
                   A clean premium experience that helps customers choose you faster.
-                  Built to look modern, load fast, and convert.
                 </p>
               </div>
 

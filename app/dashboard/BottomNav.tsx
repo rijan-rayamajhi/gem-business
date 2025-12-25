@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   AddSquare,
   Calendar,
@@ -44,20 +44,15 @@ function isActive(pathname: string, href: string) {
 export default function BottomNav() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const [open, setOpen] = useState(false);
 
-  const shouldHide = pathname.startsWith("/dashboard/catalogue/") && pathname !== "/dashboard/catalogue";
+  const shouldHide =
+    (pathname.startsWith("/dashboard/catalogue/") && pathname !== "/dashboard/catalogue") ||
+    pathname.startsWith("/dashboard/boost-ads") ||
+    pathname.startsWith("/dashboard/event/create");
 
   useEffect(() => {
-    if (!open) return;
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+    return;
+  }, []);
 
   if (shouldHide) {
     return null;
@@ -65,47 +60,6 @@ export default function BottomNav() {
 
   return (
     <>
-      {open ? (
-        <div className="fixed inset-0 z-[60]">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white shadow-2xl">
-            <div className="mx-auto w-full max-w-3xl px-4 py-4">
-              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-zinc-200" />
-              <div className="grid gap-2">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-2xl border border-zinc-900/10 bg-white px-4 py-4 text-left text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
-                  onClick={() => {
-                    setOpen(false);
-                    router.push("/catalogue/create");
-                  }}
-                >
-                  <span>Create Catalogue</span>
-                  <span className="text-xs font-medium text-zinc-500">Open</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-2xl border border-zinc-900/10 bg-white px-4 py-4 text-left text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
-                  onClick={() => {
-                    setOpen(false);
-                    router.push("/dashboard/event");
-                  }}
-                >
-                  <span>Create Event</span>
-                  <span className="text-xs font-medium text-zinc-500">Open</span>
-                </button>
-              </div>
-              <div className="h-4" />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <nav
         aria-label="Dashboard"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70"
@@ -120,7 +74,7 @@ export default function BottomNav() {
                   type="button"
                   aria-label="Create"
                   className="flex h-14 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-900"
-                  onClick={() => setOpen(true)}
+                  onClick={() => router.push("/dashboard/event/create")}
                 >
                   <span className="h-1 w-8 rounded-full bg-transparent" />
                   <span className="grid place-items-center">

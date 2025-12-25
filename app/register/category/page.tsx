@@ -31,6 +31,8 @@ type BusinessDraftResponse = {
         vehicleTypes?: string[];
         shopType?: string;
         brands?: string[];
+        suggestedBrandName?: string;
+        suggestedBrandLogoUrl?: string;
       }
     | null;
 };
@@ -95,6 +97,17 @@ export default function RegisterCategoryPage() {
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [shopType, setShopType] = useState<ShopType | "">("");
   const [brands, setBrands] = useState<string[]>([]);
+  const [suggestedBrandName, setSuggestedBrandName] = useState("");
+  const [suggestedBrandLogoFile, setSuggestedBrandLogoFile] = useState<File | null>(null);
+  const [suggestedBrandLogoPreviewUrl, setSuggestedBrandLogoPreviewUrl] = useState<string>("");
+  const [suggestedBrandLogoUrl, setSuggestedBrandLogoUrl] = useState("");
+  const [showSuggestedBrand, setShowSuggestedBrand] = useState(false);
+  const [suggestedBrandSubmitState, setSuggestedBrandSubmitState] = useState<
+    | { status: "idle" }
+    | { status: "submitting" }
+    | { status: "success"; message: string }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
   const [brandVehicleTypeFilter, setBrandVehicleTypeFilter] = useState<VehicleType | "all">("all");
   const [brandsState, setBrandsState] = useState<BrandsState>({ status: "idle", items: [] });
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
@@ -151,6 +164,139 @@ export default function RegisterCategoryPage() {
       window.removeEventListener("keydown", markUserKeyScroll);
     };
   }, []);
+
+  useEffect(() => {
+    if (!suggestedBrandLogoFile) {
+      setSuggestedBrandLogoPreviewUrl((prev) => {
+        if (prev) {
+          try {
+            URL.revokeObjectURL(prev);
+          } catch {
+            // ignore
+          }
+        }
+        return "";
+      });
+      return;
+    }
+
+    const nextUrl = URL.createObjectURL(suggestedBrandLogoFile);
+    setSuggestedBrandLogoPreviewUrl((prev) => {
+      if (prev) {
+        try {
+          URL.revokeObjectURL(prev);
+        } catch {
+          // ignore
+        }
+      }
+      return nextUrl;
+    });
+
+    return () => {
+      try {
+        URL.revokeObjectURL(nextUrl);
+      } catch {
+        // ignore
+      }
+    };
+  }, [suggestedBrandLogoFile]);
+
+  async function submitSuggestedBrand() {
+    const name = suggestedBrandName.trim();
+    if (!name) {
+      setSuggestedBrandSubmitState({ status: "error", message: "Please enter a brand name." });
+      return;
+    }
+
+    if (!suggestedBrandLogoFile && !suggestedBrandLogoUrl.trim()) {
+      setSuggestedBrandSubmitState({ status: "error", message: "Please upload a brand logo." });
+      return;
+    }
+
+    const token = (() => {
+      try {
+        return sessionStorage.getItem("gem_id_token");
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!token) {
+      setSuggestedBrandSubmitState({
+        status: "error",
+        message: "Please open this page from the mobile app.",
+      });
+      return;
+    }
+
+    setSuggestedBrandSubmitState({ status: "submitting" });
+
+    const source = businessCategory === "Machanic Shop" ? "vehicleBrands" : "brands";
+
+    try {
+      const context = {
+        businessCategory,
+        ...(shopType ? { shopType } : {}),
+        source,
+      };
+
+      const requestInit: RequestInit = (() => {
+        if (suggestedBrandLogoFile) {
+          const form = new FormData();
+          form.append("name", name);
+          form.append("logo", suggestedBrandLogoFile);
+          form.append("context", JSON.stringify(context));
+
+          return {
+            method: "POST",
+            headers: new Headers({
+              Authorization: `Bearer ${token}`,
+            }),
+            body: form,
+          };
+        }
+
+        return {
+          method: "POST",
+          headers: new Headers({
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({ name, logoUrl: suggestedBrandLogoUrl.trim(), context }),
+        };
+      })();
+
+      const res = await fetch("/api/brands", requestInit);
+
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; logoUrl?: string }
+        | null;
+
+      if (!res.ok || !data?.ok) {
+        setSuggestedBrandSubmitState({
+          status: "error",
+          message: data?.message || "Failed to submit suggestion.",
+        });
+        return;
+      }
+
+      setSuggestedBrandSubmitState({
+        status: "success",
+        message: data?.message || "Suggestion received.",
+      });
+
+      if (typeof data?.logoUrl === "string" && data.logoUrl.trim()) {
+        setSuggestedBrandLogoUrl(data.logoUrl.trim());
+      }
+
+      setTouched((prev) => ({ ...prev, brands: true }));
+    } catch {
+      setSuggestedBrandSubmitState({
+        status: "error",
+        message: "Network error. Please try again.",
+      });
+    }
+  }
 
   const scrollToRef = (
     ref: React.RefObject<HTMLElement | null>,
@@ -270,6 +416,8 @@ export default function RegisterCategoryPage() {
   const fieldErrors = useMemo(() => {
     const errors: Record<string, string> = {};
 
+    const hasSuggestedBrand = Boolean(suggestedBrandName.trim()) && Boolean(suggestedBrandLogoUrl.trim());
+
     if (!businessCategory) errors.businessCategory = "Please select your business category.";
 
     if (businessCategory === "Others" && !otherCategoryName.trim()) {
@@ -284,17 +432,34 @@ export default function RegisterCategoryPage() {
       errors.shopType = "Please select your shop type.";
     }
 
-    if (businessCategory && !needsVehicleTypes && shopType === "authorised shop" && brands.length !== 1) {
+    if (
+      businessCategory &&
+      !needsVehicleTypes &&
+      shopType === "authorised shop" &&
+      brands.length !== 1 &&
+      !hasSuggestedBrand
+    ) {
       errors.brands = "Please select exactly one brand.";
     }
 
     if (businessCategory && !needsVehicleTypes && shopType === "local shop") {
-      if (brands.length === 0) errors.brands = "Please select at least one brand.";
+      if (brands.length === 0 && !hasSuggestedBrand) {
+        errors.brands = "Please select at least one brand.";
+      }
       if (brands.length > 5) errors.brands = "You can select up to 5 brands.";
     }
 
     return errors;
-  }, [brands.length, businessCategory, needsVehicleTypes, otherCategoryName, shopType, vehicleTypes.length]);
+  }, [
+    brands.length,
+    businessCategory,
+    needsVehicleTypes,
+    otherCategoryName,
+    shopType,
+    suggestedBrandName,
+    suggestedBrandLogoUrl,
+    vehicleTypes.length,
+  ]);
 
   const validationError = useMemo(() => {
     const firstError = Object.values(fieldErrors).find(Boolean);
@@ -450,6 +615,10 @@ export default function RegisterCategoryPage() {
         const nextBrands = Array.isArray(data.business.brands)
           ? (data.business.brands.filter((value) => typeof value === "string") as string[])
           : [];
+        const nextSuggestedBrandName =
+          typeof data.business.suggestedBrandName === "string" ? data.business.suggestedBrandName : "";
+        const nextSuggestedBrandLogoUrl =
+          typeof data.business.suggestedBrandLogoUrl === "string" ? data.business.suggestedBrandLogoUrl : "";
 
         setBusinessCategory(
           (BUSINESS_CATEGORIES as readonly string[]).includes(nextCategory)
@@ -465,6 +634,8 @@ export default function RegisterCategoryPage() {
           )
         );
         setBrands(nextBrands);
+        setSuggestedBrandName(nextSuggestedBrandName);
+        setSuggestedBrandLogoUrl(nextSuggestedBrandLogoUrl);
       } catch {
         // ignore
       }
@@ -517,11 +688,15 @@ export default function RegisterCategoryPage() {
         for (const type of vehicleTypes) payload.append("vehicleTypes", type);
         payload.append("shopType", "");
         payload.append("brands", "");
+        payload.append("suggestedBrandName", "");
+        payload.append("suggestedBrandLogoUrl", "");
       } else {
         payload.append("shopType", shopType);
         payload.append("vehicleTypes", "");
 
         for (const brand of brands) payload.append("brands", brand);
+        payload.append("suggestedBrandName", suggestedBrandName.trim());
+        payload.append("suggestedBrandLogoUrl", suggestedBrandLogoUrl.trim());
       }
 
       const res = await fetch("/api/register", {
@@ -606,6 +781,11 @@ export default function RegisterCategoryPage() {
                             setVehicleTypes([]);
                             setShopType("");
                             setBrands([]);
+                            setSuggestedBrandName("");
+                            setSuggestedBrandLogoFile(null);
+                            setSuggestedBrandLogoUrl("");
+                            setShowSuggestedBrand(false);
+                            setSuggestedBrandSubmitState({ status: "idle" });
                             setBrandsState({ status: "idle", items: [] });
                             setBrandVehicleTypeFilter("all");
                             setTouched((prev) => ({ ...prev, businessCategory: true }));
@@ -721,6 +901,11 @@ export default function RegisterCategoryPage() {
                             onChange={() => {
                               setShopType(type);
                               setBrands([]);
+                              setSuggestedBrandName("");
+                              setSuggestedBrandLogoFile(null);
+                              setSuggestedBrandLogoUrl("");
+                              setShowSuggestedBrand(false);
+                              setSuggestedBrandSubmitState({ status: "idle" });
                               setBrandsState({ status: "idle", items: [] });
                               setTouched((prev) => ({ ...prev, shopType: true }));
                               setSubmitState({ status: "idle" });
@@ -791,6 +976,12 @@ export default function RegisterCategoryPage() {
                     </div>
                   )}
 
+                  {brandsState.status !== "loading" && filteredBrands.length === 0 && (
+                    <div className="rounded-xl border border-zinc-900/10 bg-white/60 px-3 py-3 text-xs text-zinc-600">
+                      No brands available.
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {filteredBrands.map((brand) => {
                       const active = brands.includes(brand.id);
@@ -844,6 +1035,10 @@ export default function RegisterCategoryPage() {
                             onChange={() => {
                               setSubmitState({ status: "idle" });
                               setTouched((prev) => ({ ...prev, brands: true }));
+                              setSuggestedBrandName("");
+                              setSuggestedBrandLogoFile(null);
+                              setSuggestedBrandLogoUrl("");
+                              setSuggestedBrandSubmitState({ status: "idle" });
 
                               if (businessCategory === "Others") {
                                 const nextCategoryName = (brand.category || brand.name).trim();
@@ -881,6 +1076,108 @@ export default function RegisterCategoryPage() {
                         </label>
                       );
                     })}
+                  </div>
+
+                  <div className="grid gap-2 rounded-xl border border-zinc-900/10 bg-white/60 px-3 py-3">
+                    <button
+                      type="button"
+                      className="text-left text-sm font-semibold text-zinc-900"
+                      onClick={() => {
+                        setShowSuggestedBrand((prev) => !prev);
+                        setSuggestedBrandSubmitState({ status: "idle" });
+                      }}
+                    >
+                      Suggest a brand
+                    </button>
+
+                    {showSuggestedBrand && (
+                      <div className="grid gap-2">
+                        <input
+                          value={suggestedBrandName}
+                          onChange={(e) => {
+                            setSuggestedBrandName(e.target.value);
+                            setSuggestedBrandLogoUrl("");
+                            setTouched((prev) => ({ ...prev, brands: true }));
+                            setSubmitState({ status: "idle" });
+                            setSuggestedBrandSubmitState({ status: "idle" });
+                          }}
+                          placeholder="Enter brand name"
+                          className="h-11 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm text-zinc-900 shadow-sm"
+                        />
+
+                        <div className="grid gap-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] ?? null;
+                              setSuggestedBrandLogoFile(file);
+                              setSuggestedBrandLogoUrl("");
+                              setTouched((prev) => ({ ...prev, brands: true }));
+                              setSubmitState({ status: "idle" });
+                              setSuggestedBrandSubmitState({ status: "idle" });
+                            }}
+                            className="block w-full text-sm text-zinc-700"
+                          />
+
+                          {(suggestedBrandLogoPreviewUrl || suggestedBrandLogoUrl) && (
+                            <div className="flex items-center gap-3">
+                              <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl border border-zinc-900/10 bg-white shadow-sm">
+                                <img
+                                  src={suggestedBrandLogoPreviewUrl || suggestedBrandLogoUrl}
+                                  alt="Brand logo preview"
+                                  className="h-full w-full object-contain"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </span>
+                              <span className="text-xs text-zinc-500">Logo selected</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={suggestedBrandSubmitState.status === "submitting"}
+                            onClick={submitSuggestedBrand}
+                          >
+                            {suggestedBrandSubmitState.status === "submitting"
+                              ? "Submitting…"
+                              : "Submit"}
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-white/80"
+                            onClick={() => {
+                              setShowSuggestedBrand(false);
+                              setSuggestedBrandName("");
+                              setSuggestedBrandLogoFile(null);
+                              setSuggestedBrandLogoUrl("");
+                              setSuggestedBrandSubmitState({ status: "idle" });
+                              setTouched((prev) => ({ ...prev, brands: true }));
+                              setSubmitState({ status: "idle" });
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        {(suggestedBrandSubmitState.status === "success" ||
+                          suggestedBrandSubmitState.status === "error") && (
+                          <div
+                            className={`text-xs ${
+                              suggestedBrandSubmitState.status === "success"
+                                ? "text-emerald-700"
+                                : "text-rose-600"
+                            }`}
+                            role="status"
+                          >
+                            {suggestedBrandSubmitState.message}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {touched.brands && fieldErrors.brands && (

@@ -254,6 +254,10 @@ export async function GET(request: Request) {
         brands: Array.isArray(data.brands)
           ? (data.brands.filter((value: unknown) => typeof value === "string") as string[])
           : [],
+        suggestedBrandName:
+          typeof data.suggestedBrandName === "string" ? data.suggestedBrandName : "",
+        suggestedBrandLogoUrl:
+          typeof data.suggestedBrandLogoUrl === "string" ? data.suggestedBrandLogoUrl : "",
         businessType: typeof data.businessType === "string" ? data.businessType : "",
         email: typeof data.email === "string" ? data.email : "",
         website: typeof data.website === "string" ? data.website : "",
@@ -328,6 +332,8 @@ export async function POST(request: Request) {
   const brands = brandsRaw
     .map((value) => String(value).trim())
     .filter(Boolean);
+  const suggestedBrandName = String(form.get("suggestedBrandName") ?? "").trim();
+  const suggestedBrandLogoUrl = String(form.get("suggestedBrandLogoUrl") ?? "").trim();
   const businessType = String(form.get("businessType") ?? "").trim();
   const email = String(form.get("email") ?? "").trim();
   const website = String(form.get("website") ?? "").trim();
@@ -507,8 +513,25 @@ export async function POST(request: Request) {
         );
       }
 
+      const hasSuggestedBrand = Boolean(suggestedBrandName);
+      const hasSuggestedBrandLogo = Boolean(suggestedBrandLogoUrl);
+
+      if (hasSuggestedBrand !== hasSuggestedBrandLogo) {
+        return NextResponse.json(
+          { ok: false, message: "Please provide both suggested brand name and logo." },
+          { status: 400 }
+        );
+      }
+
+      if (hasSuggestedBrandLogo && !isValidUrl(suggestedBrandLogoUrl)) {
+        return NextResponse.json(
+          { ok: false, message: "Suggested brand logo URL is invalid." },
+          { status: 400 }
+        );
+      }
+
       if (shopType === "authorised shop") {
-        if (brands.length !== 1) {
+        if (brands.length !== 1 && !(hasSuggestedBrand && hasSuggestedBrandLogo)) {
           return NextResponse.json(
             { ok: false, message: "Please select exactly one brand." },
             { status: 400 }
@@ -517,7 +540,7 @@ export async function POST(request: Request) {
       }
 
       if (shopType === "local shop") {
-        if (brands.length === 0) {
+        if (brands.length === 0 && !(hasSuggestedBrand && hasSuggestedBrandLogo)) {
           return NextResponse.json(
             { ok: false, message: "Please select at least one brand." },
             { status: 400 }
@@ -682,6 +705,12 @@ export async function POST(request: Request) {
   }
   if (form.has("brands")) {
     payload.brands = brands;
+  }
+  if (form.has("suggestedBrandName")) {
+    payload.suggestedBrandName = suggestedBrandName;
+  }
+  if (form.has("suggestedBrandLogoUrl")) {
+    payload.suggestedBrandLogoUrl = suggestedBrandLogoUrl;
   }
   if (businessType) payload.businessType = businessType;
   if (email) payload.email = email.toLowerCase();
