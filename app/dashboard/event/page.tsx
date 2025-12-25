@@ -30,6 +30,16 @@ function formatDate(value?: string) {
   });
 }
 
+function formatTime(value?: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function EventCard(props: { item: EventItem; onDelete: (id: string) => void }) {
   const { item, onDelete } = props;
 
@@ -40,6 +50,10 @@ function EventCard(props: { item: EventItem; onDelete: (id: string) => void }) {
   const [imgFailed, setImgFailed] = useState(false);
 
   const canDelete = status === "draft" || status === "rejected";
+
+  const startDateValue = item.startDateTime || item.startDate;
+  const endDateValue = item.endDateTime || item.endDate;
+  const timeText = item.timeText || (startDateValue ? `${formatTime(startDateValue)}${endDateValue ? ` - ${formatTime(endDateValue)}` : ""}` : "");
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white text-left shadow-sm transition hover:bg-zinc-50">
@@ -70,12 +84,12 @@ function EventCard(props: { item: EventItem; onDelete: (id: string) => void }) {
 
         <div className="mt-2 grid gap-1 text-xs text-zinc-600">
           <div>
-            <span className="font-medium text-zinc-900">Dates:</span> {formatDate(item.startDate)}
-            {item.endDate ? ` - ${formatDate(item.endDate)}` : ""}
+            <span className="font-medium text-zinc-900">Dates:</span> {formatDate(startDateValue)}
+            {endDateValue ? ` - ${formatDate(endDateValue)}` : ""}
           </div>
-          {item.timeText ? (
+          {timeText ? (
             <div>
-              <span className="font-medium text-zinc-900">Time:</span> {item.timeText}
+              <span className="font-medium text-zinc-900">Time:</span> {timeText}
             </div>
           ) : null}
           {item.location?.address ? (
@@ -179,6 +193,9 @@ export default function DashboardEventPage() {
             const id = typeof obj.id === "string" ? obj.id : "";
             const title = typeof obj.title === "string" ? obj.title : "";
             const description = typeof obj.description === "string" ? obj.description : "";
+            const launchDateTime = typeof obj.launchDateTime === "string" ? obj.launchDateTime : "";
+            const startDateTime = typeof obj.startDateTime === "string" ? obj.startDateTime : "";
+            const endDateTime = typeof obj.endDateTime === "string" ? obj.endDateTime : "";
             const startDate = typeof obj.startDate === "string" ? obj.startDate : "";
             const endDate = typeof obj.endDate === "string" ? obj.endDate : "";
             const timeText = typeof obj.timeText === "string" ? obj.timeText : "";
@@ -186,19 +203,63 @@ export default function DashboardEventPage() {
             const status = typeof obj.status === "string" ? obj.status : "";
 
             const tags = Array.isArray(obj.tags) ? obj.tags.filter((t) => typeof t === "string") : [];
-            const location = obj.location && typeof obj.location === "object" ? (obj.location as Record<string, unknown>) : null;
+            const location =
+              obj.location && typeof obj.location === "object"
+                ? (obj.location as Record<string, unknown>)
+                : null;
             const address = location && typeof location.address === "string" ? location.address : "";
+            const name = location && typeof location.name === "string" ? location.name : "";
+            const show = location && typeof location.show === "boolean" ? location.show : undefined;
+            const radiusKm = location && typeof location.radiusKm === "number" ? location.radiusKm : undefined;
+
+            const unlockQrAtVenue = typeof obj.unlockQrAtVenue === "boolean" ? obj.unlockQrAtVenue : undefined;
+            const groupsEnabled = typeof obj.groupsEnabled === "boolean" ? obj.groupsEnabled : undefined;
+            const vehicleVerified = typeof obj.vehicleVerified === "boolean" ? obj.vehicleVerified : undefined;
+
+            const hosts = Array.isArray(obj.hosts)
+              ? obj.hosts
+                  .filter((h) => h && typeof h === "object")
+                  .map((h) => {
+                    const host = h as Record<string, unknown>;
+                    const name = typeof host.name === "string" ? host.name : "";
+                    const imageUrl = typeof host.imageUrl === "string" ? host.imageUrl : "";
+                    const url = typeof host.url === "string" ? host.url : "";
+                    const show = typeof host.show === "boolean" ? host.show : undefined;
+                    return {
+                      ...(name ? { name } : { name: "" }),
+                      ...(imageUrl ? { imageUrl } : {}),
+                      ...(url ? { url } : {}),
+                      ...(typeof show === "boolean" ? { show } : {}),
+                    };
+                  })
+              : [];
 
             return {
               id,
               ...(title ? { title } : {}),
               ...(description ? { description } : {}),
+              ...(launchDateTime ? { launchDateTime } : {}),
+              ...(startDateTime ? { startDateTime } : {}),
+              ...(endDateTime ? { endDateTime } : {}),
               ...(startDate ? { startDate } : {}),
               ...(endDate ? { endDate } : {}),
               ...(timeText ? { timeText } : {}),
               ...(bannerUrl ? { bannerUrl } : {}),
               ...(tags.length ? { tags } : {}),
-              ...(address ? { location: { address } } : {}),
+              ...(address || name || typeof show === "boolean" || typeof radiusKm === "number"
+                ? {
+                    location: {
+                      ...(address ? { address } : {}),
+                      ...(name ? { name } : {}),
+                      ...(typeof show === "boolean" ? { show } : {}),
+                      ...(typeof radiusKm === "number" ? { radiusKm } : {}),
+                    },
+                  }
+                : {}),
+              ...(hosts.length ? { hosts } : {}),
+              ...(typeof unlockQrAtVenue === "boolean" ? { unlockQrAtVenue } : {}),
+              ...(typeof groupsEnabled === "boolean" ? { groupsEnabled } : {}),
+              ...(typeof vehicleVerified === "boolean" ? { vehicleVerified } : {}),
               ...(status ? { status } : {}),
             } satisfies EventItem;
           })

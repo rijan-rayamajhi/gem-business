@@ -91,10 +91,13 @@ function useGoogleMapsScript(apiKey?: string | null) {
 type Props = {
   title: string;
   description: string;
-  startDate: string;
-  endDate: string;
-  timeText: string;
+  launchDateTime: string;
+  startDateTime: string;
+  endDateTime: string;
   locationAddress: string;
+  locationName: string;
+  locationShow: boolean;
+  locationRadiusKm: string;
   locationPlaceId?: string;
   locationLat?: number;
   locationLng?: number;
@@ -104,10 +107,13 @@ type Props = {
   errors: Record<string, string>;
   onTitle: (v: string) => void;
   onDescription: (v: string) => void;
-  onStartDate: (v: string) => void;
-  onEndDate: (v: string) => void;
-  onTimeText: (v: string) => void;
+  onLaunchDateTime: (v: string) => void;
+  onStartDateTime: (v: string) => void;
+  onEndDateTime: (v: string) => void;
   onLocationAddress: (v: string) => void;
+  onLocationName: (v: string) => void;
+  onLocationShow: (v: boolean) => void;
+  onLocationRadiusKm: (v: string) => void;
   onLocationPlaceId: (v: string | undefined) => void;
   onLocationLat: (v: number | undefined) => void;
   onLocationLng: (v: number | undefined) => void;
@@ -124,10 +130,13 @@ export default function EventBasicsSection(props: Props) {
   const {
     title,
     description,
-    startDate,
-    endDate,
-    timeText,
+    launchDateTime,
+    startDateTime,
+    endDateTime,
     locationAddress,
+    locationName,
+    locationShow,
+    locationRadiusKm,
     locationPlaceId,
     locationLat,
     locationLng,
@@ -137,10 +146,13 @@ export default function EventBasicsSection(props: Props) {
     errors,
     onTitle,
     onDescription,
-    onStartDate,
-    onEndDate,
-    onTimeText,
+    onLaunchDateTime,
+    onStartDateTime,
+    onEndDateTime,
     onLocationAddress,
+    onLocationName,
+    onLocationShow,
+    onLocationRadiusKm,
     onLocationPlaceId,
     onLocationLat,
     onLocationLng,
@@ -369,72 +381,72 @@ export default function EventBasicsSection(props: Props) {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="eventStartDate">
-              Event start date
+            <label className="text-sm font-medium" htmlFor="eventLaunchDateTime">
+              Launch Date Time
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-500">
                 <Calendar size={18} variant="Linear" color="#71717a" aria-hidden="true" />
               </span>
               <input
-                id="eventStartDate"
-                type="date"
+                id="eventLaunchDateTime"
+                type="datetime-local"
                 className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 pl-10 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                value={startDate}
-                onChange={(e) => onStartDate(e.target.value)}
-                onBlur={() => onTouched((p) => ({ ...p, startDate: true }))}
+                value={launchDateTime}
+                onChange={(e) => onLaunchDateTime(e.target.value)}
+                onBlur={() => onTouched((p) => ({ ...p, launchDateTime: true }))}
                 required
               />
             </div>
-            {touched.startDate && errors.startDate ? (
-              <div className="text-xs text-rose-600">{errors.startDate}</div>
+            {touched.launchDateTime && errors.launchDateTime ? (
+              <div className="text-xs text-rose-600">{errors.launchDateTime}</div>
             ) : null}
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm font-medium" htmlFor="eventEndDate">
-              Event end date
+            <label className="text-sm font-medium" htmlFor="eventStartDateTime">
+              Start Date Time
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-500">
-                <Calendar size={18} variant="Linear" color="#71717a" aria-hidden="true" />
+                <Clock size={18} variant="Linear" color="#71717a" aria-hidden="true" />
               </span>
               <input
-                id="eventEndDate"
-                type="date"
+                id="eventStartDateTime"
+                type="datetime-local"
                 className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 pl-10 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                value={endDate}
-                onChange={(e) => onEndDate(e.target.value)}
-                onBlur={() => onTouched((p) => ({ ...p, endDate: true }))}
+                value={startDateTime}
+                onChange={(e) => onStartDateTime(e.target.value)}
+                onBlur={() => onTouched((p) => ({ ...p, startDateTime: true }))}
                 required
               />
             </div>
-            {touched.endDate && errors.endDate ? (
-              <div className="text-xs text-rose-600">{errors.endDate}</div>
+            {touched.startDateTime && errors.startDateTime ? (
+              <div className="text-xs text-rose-600">{errors.startDateTime}</div>
             ) : null}
           </div>
         </div>
 
         <div className="grid gap-2">
-          <label className="text-sm font-medium" htmlFor="eventTimeText">
-            Event time
+          <label className="text-sm font-medium" htmlFor="eventEndDateTime">
+            End Date Time
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-500">
               <Clock size={18} variant="Linear" color="#71717a" aria-hidden="true" />
             </span>
             <input
-              id="eventTimeText"
-              type="time"
+              id="eventEndDateTime"
+              type="datetime-local"
               className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 pl-10 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
-              value={timeText}
-              onChange={(e) => onTimeText(e.target.value)}
-              onBlur={() => onTouched((p) => ({ ...p, timeText: true }))}
+              value={endDateTime}
+              onChange={(e) => onEndDateTime(e.target.value)}
+              onBlur={() => onTouched((p) => ({ ...p, endDateTime: true }))}
               required
             />
           </div>
-          {touched.timeText && errors.timeText ? (
-            <div className="text-xs text-rose-600">{errors.timeText}</div>
+          {touched.endDateTime && errors.endDateTime ? (
+            <div className="text-xs text-rose-600">{errors.endDateTime}</div>
           ) : null}
         </div>
 
@@ -502,6 +514,48 @@ export default function EventBasicsSection(props: Props) {
               </div>
             </div>
           ) : null}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="eventLocationName">
+                Location Name
+              </label>
+              <input
+                id="eventLocationName"
+                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
+                value={locationName}
+                onChange={(e) => onLocationName(e.target.value)}
+                onBlur={() => onTouched((p) => ({ ...p, locationName: true }))}
+                placeholder="Optional"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="eventLocationRadius">
+                Radius (km)
+              </label>
+              <input
+                id="eventLocationRadius"
+                inputMode="decimal"
+                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
+                value={locationRadiusKm}
+                onChange={(e) => onLocationRadiusKm(e.target.value)}
+                onBlur={() => onTouched((p) => ({ ...p, locationRadiusKm: true }))}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-900/10 bg-white px-3 py-2 shadow-sm">
+            <div className="text-sm font-medium">Show/Hide</div>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+              onClick={() => onLocationShow(!locationShow)}
+            >
+              {locationShow ? "Show" : "Hide"}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-2">

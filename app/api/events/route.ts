@@ -25,6 +25,38 @@ function parseJson<T>(value: unknown, fallback: T): T {
   }
 }
 
+type FaqInput = {
+  question: string;
+  answer: string;
+};
+
+function normalizeFaq(raw: unknown): FaqInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const question = typeof obj.question === "string" ? obj.question.trim() : "";
+  const answer = typeof obj.answer === "string" ? obj.answer.trim() : "";
+  if (!question && !answer) return null;
+  return { question, answer };
+}
+
+type HostInput = {
+  name: string;
+  show: boolean;
+  url: string;
+  hasImage: boolean;
+};
+
+function normalizeHost(raw: unknown): HostInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const name = typeof obj.name === "string" ? obj.name.trim() : "";
+  const url = typeof obj.url === "string" ? obj.url.trim() : "";
+  const show = typeof obj.show === "boolean" ? obj.show : obj.show !== false;
+  const hasImage = typeof obj.hasImage === "boolean" ? obj.hasImage : Boolean(obj.hasImage);
+  if (!name && !url && !hasImage) return null;
+  return { name, url, show: Boolean(show), hasImage };
+}
+
 async function uploadImageToStorage(params: { uid: string; file: File; folder: string }) {
   const { uid, file, folder } = params;
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -135,17 +167,33 @@ export async function POST(request: Request) {
 
   const title = String(form.get("title") ?? "").trim();
   const description = String(form.get("description") ?? "").trim();
-  const startDate = String(form.get("startDate") ?? "").trim();
-  const endDate = String(form.get("endDate") ?? "").trim();
-  const timeText = String(form.get("timeText") ?? "").trim();
+  const launchDateTime = String(form.get("launchDateTime") ?? "").trim();
+  const startDateTime = String(form.get("startDateTime") ?? "").trim();
+  const endDateTime = String(form.get("endDateTime") ?? "").trim();
   const locationAddress = String(form.get("locationAddress") ?? "").trim();
+  const locationName = String(form.get("locationName") ?? "").trim();
+  const locationShowRaw = String(form.get("locationShow") ?? "true").trim().toLowerCase();
+  const locationShow = locationShowRaw !== "false";
+  const locationRadiusKmRaw = String(form.get("locationRadiusKm") ?? "").trim();
   const locationPlaceId = String(form.get("locationPlaceId") ?? "").trim();
   const locationLatRaw = String(form.get("locationLat") ?? "").trim();
   const locationLngRaw = String(form.get("locationLng") ?? "").trim();
 
+  const unlockQrAtVenueRaw = String(form.get("unlockQrAtVenue") ?? "false").trim().toLowerCase();
+  const groupsEnabledRaw = String(form.get("groupsEnabled") ?? "false").trim().toLowerCase();
+  const vehicleVerifiedRaw = String(form.get("vehicleVerified") ?? "false").trim().toLowerCase();
+  const unlockQrAtVenue = unlockQrAtVenueRaw === "true";
+  const groupsEnabled = groupsEnabledRaw === "true";
+  const vehicleVerified = vehicleVerifiedRaw === "true";
+
   const tagsRaw = form.get("tags");
   const termsHtml = String(form.get("termsHtml") ?? "");
   const aboutHtml = String(form.get("aboutHtml") ?? "");
+  const thingsToKnow = String(form.get("thingsToKnow") ?? "");
+  const amenities = String(form.get("amenities") ?? "");
+  const buttonText = String(form.get("buttonText") ?? "");
+  const faqsRaw = form.get("faqs");
+  const hostsRaw = form.get("hosts");
 
   const organiserName = String(form.get("organiserName") ?? "").trim();
 
@@ -168,15 +216,20 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!startDate || !endDate) {
+  if (!launchDateTime || !startDateTime || !endDateTime) {
     return NextResponse.json(
-      { ok: false, message: "Start date and end date are required." },
+      { ok: false, message: "Launch date/time, start date/time and end date/time are required." },
       { status: 400 }
     );
   }
 
-  if (!timeText) {
-    return NextResponse.json({ ok: false, message: "Event time is required." }, { status: 400 });
+  const startMs = new Date(startDateTime).getTime();
+  const endMs = new Date(endDateTime).getTime();
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs < startMs) {
+    return NextResponse.json(
+      { ok: false, message: "End date/time must be after start date/time." },
+      { status: 400 }
+    );
   }
 
   if (!locationAddress) {
@@ -207,6 +260,12 @@ export async function POST(request: Request) {
   const ticketObjs = parseJson<unknown[]>(ticketsRaw, []);
   const tickets = ticketObjs.map(normalizeTicket).filter((t): t is TicketInput => Boolean(t));
 
+  const faqObjs = parseJson<unknown[]>(faqsRaw, []);
+  const faqs = faqObjs.map(normalizeFaq).filter((f): f is FaqInput => Boolean(f));
+
+  const hostObjs = parseJson<unknown[]>(hostsRaw, []);
+  const hostsInput = hostObjs.map(normalizeHost).filter((h): h is HostInput => Boolean(h));
+
   if (tickets.length < 1) {
     return NextResponse.json(
       { ok: false, message: "Please add at least 1 ticket." },
@@ -234,10 +293,14 @@ export async function POST(request: Request) {
 
   const gallery = form.getAll("gallery").filter((value): value is File => value instanceof File);
 
+  const hostImages = form
+    .getAll("hostImages")
+    .filter((value): value is File => value instanceof File);
+
   const organiserLogo = form.get("organiserLogo");
 
   const maxImageBytes = 5 * 1024 * 1024;
-  for (const img of [banner, ...sponsorLogos, ...partnerLogos, ...gallery]) {
+  for (const img of [banner, ...sponsorLogos, ...partnerLogos, ...gallery, ...hostImages]) {
     if (img.size > maxImageBytes) {
       return NextResponse.json(
         { ok: false, message: "Each image must be under 5MB." },
@@ -299,6 +362,27 @@ export async function POST(request: Request) {
       galleryUrls.push(upload.publicUrl);
     }
 
+    const hostImageUrls: string[] = [];
+    for (const img of hostImages) {
+      const upload = await uploadImageToStorage({ uid, file: img, folder: "eventHostImages" });
+      hostImageUrls.push(upload.publicUrl);
+    }
+
+    let hostImageIdx = 0;
+    const hosts = hostsInput.map((h) => {
+      const next = {
+        ...(h.name ? { name: h.name } : { name: "" }),
+        ...(h.url ? { url: h.url } : {}),
+        ...(h.show === false ? { show: false } : {}),
+      } as { name: string; url?: string; show?: boolean; imageUrl?: string };
+      if (h.hasImage) {
+        const imageUrl = hostImageUrls[hostImageIdx] || "";
+        hostImageIdx++;
+        if (imageUrl) next.imageUrl = imageUrl;
+      }
+      return next;
+    });
+
     const sponsors = sponsorNames.map((name, idx) => ({
       name,
       ...(sponsorLogoUrls[idx] ? { logoUrl: sponsorLogoUrls[idx] } : {}),
@@ -311,16 +395,22 @@ export async function POST(request: Request) {
 
     const locationLat = locationLatRaw ? Number(locationLatRaw) : NaN;
     const locationLng = locationLngRaw ? Number(locationLngRaw) : NaN;
+    const locationRadiusKm = locationRadiusKmRaw ? Number(locationRadiusKmRaw) : NaN;
 
     const docRef = await adminDb.collection("events").add({
       userId: uid,
       title,
       description,
-      startDate,
-      endDate,
-      timeText,
+      launchDateTime,
+      startDateTime,
+      endDateTime,
+      startDate: startDateTime,
+      endDate: endDateTime,
       location: {
         address: locationAddress,
+        ...(locationName ? { name: locationName } : {}),
+        ...(locationShow === false ? { show: false } : {}),
+        ...(Number.isFinite(locationRadiusKm) ? { radiusKm: locationRadiusKm } : {}),
         ...(locationPlaceId ? { placeId: locationPlaceId } : {}),
         ...(Number.isFinite(locationLat) ? { lat: locationLat } : {}),
         ...(Number.isFinite(locationLng) ? { lng: locationLng } : {}),
@@ -329,6 +419,14 @@ export async function POST(request: Request) {
       tags,
       ...(termsHtml ? { termsHtml } : {}),
       ...(aboutHtml ? { aboutHtml } : {}),
+      ...(thingsToKnow ? { thingsToKnow } : {}),
+      ...(amenities ? { amenities } : {}),
+      ...(buttonText ? { buttonText } : {}),
+      ...(faqs.length ? { faqs } : {}),
+      ...(hosts.length ? { hosts } : {}),
+      ...(unlockQrAtVenue ? { unlockQrAtVenue } : {}),
+      ...(groupsEnabled ? { groupsEnabled } : {}),
+      ...(vehicleVerified ? { vehicleVerified } : {}),
       organiser: {
         name: organiserName,
         ...(organiserLogoUrl ? { logoUrl: organiserLogoUrl } : {}),

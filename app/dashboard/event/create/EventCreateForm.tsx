@@ -6,6 +6,7 @@ import EventBasicsSection from "./sections/EventBasicsSection";
 import EventContentSection from "./sections/EventContentSection";
 import EventOrganiserSection from "./sections/EventOrganiserSection";
 import EventMediaPartiesSection from "./sections/EventMediaPartiesSection";
+import EventSettingsSection from "./sections/EventSettingsSection";
 import EventTicketsSection from "./sections/EventTicketsSection";
 
 export type TicketDraft = {
@@ -20,6 +21,18 @@ export type TicketDraft = {
 export type PartyDraft = {
   name: string;
   logo: File | null;
+};
+
+export type HostDraft = {
+  name: string;
+  image: File | null;
+  show: boolean;
+  url: string;
+};
+
+export type FaqDraft = {
+  question: string;
+  answer: string;
 };
 
 type StepKey = "details" | "content" | "media" | "tickets";
@@ -57,10 +70,13 @@ export default function EventCreateForm() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [timeText, setTimeText] = useState("");
+  const [launchDateTime, setLaunchDateTime] = useState("");
+  const [startDateTime, setStartDateTime] = useState("");
+  const [endDateTime, setEndDateTime] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [locationShow, setLocationShow] = useState(true);
+  const [locationRadiusKm, setLocationRadiusKm] = useState("");
   const [locationPlaceId, setLocationPlaceId] = useState<string | undefined>(undefined);
   const [locationLat, setLocationLat] = useState<number | undefined>(undefined);
   const [locationLng, setLocationLng] = useState<number | undefined>(undefined);
@@ -68,11 +84,20 @@ export default function EventCreateForm() {
   const [banner, setBanner] = useState<File | null>(null);
   const [tags, setTags] = useState<string[]>([]);
 
+  const [unlockQrAtVenue, setUnlockQrAtVenue] = useState(false);
+  const [groupsEnabled, setGroupsEnabled] = useState(false);
+  const [vehicleVerified, setVehicleVerified] = useState(false);
+
   const [termsHtml, setTermsHtml] = useState("<p></p>");
   const [aboutHtml, setAboutHtml] = useState("<p></p>");
+  const [thingsToKnow, setThingsToKnow] = useState("");
+  const [amenities, setAmenities] = useState("");
+  const [buttonText, setButtonText] = useState("");
+  const [faqs, setFaqs] = useState<FaqDraft[]>([{ question: "", answer: "" }]);
 
   const [organiserName, setOrganiserName] = useState("");
   const [organiserLogo, setOrganiserLogo] = useState<File | null>(null);
+  const [hosts, setHosts] = useState<HostDraft[]>([{ name: "", image: null, show: true, url: "" }]);
 
   const [sponsors, setSponsors] = useState<PartyDraft[]>([]);
   const [partners, setPartners] = useState<PartyDraft[]>([]);
@@ -92,18 +117,17 @@ export default function EventCreateForm() {
     if (!safeTrim(title)) next.title = "Event title is required.";
     if (!safeTrim(description)) next.description = "Event description is required.";
 
-    if (!startDate) next.startDate = "Start date is required.";
-    if (!endDate) next.endDate = "End date is required.";
+    if (!launchDateTime) next.launchDateTime = "Launch date & time is required.";
+    if (!startDateTime) next.startDateTime = "Start date & time is required.";
+    if (!endDateTime) next.endDateTime = "End date & time is required.";
 
-    if (startDate && endDate) {
-      const s = new Date(startDate).getTime();
-      const e = new Date(endDate).getTime();
+    if (startDateTime && endDateTime) {
+      const s = new Date(startDateTime).getTime();
+      const e = new Date(endDateTime).getTime();
       if (Number.isFinite(s) && Number.isFinite(e) && e < s) {
-        next.endDate = "End date must be after start date.";
+        next.endDateTime = "End date/time must be after start date/time.";
       }
     }
-
-    if (!safeTrim(timeText)) next.timeText = "Event time is required.";
     if (!safeTrim(locationAddress)) next.locationAddress = "Event location is required.";
 
     if (!banner) next.banner = "Event banner is required.";
@@ -149,12 +173,12 @@ export default function EventCreateForm() {
     }
 
     return next;
-  }, [aboutHtml, banner, description, endDate, gallery, locationAddress, organiserLogo, organiserName, partners, sponsors, startDate, tags.length, tickets, timeText, title, termsHtml]);
+  }, [aboutHtml, amenities, banner, buttonText, description, endDateTime, gallery, launchDateTime, locationAddress, locationName, locationRadiusKm, organiserLogo, organiserName, partners, sponsors, startDateTime, tags.length, tickets, thingsToKnow, title, termsHtml]);
 
   const canSubmit = Object.keys(errors).length === 0;
 
   const detailsErrorKeys = useMemo(
-    () => ["title", "description", "startDate", "endDate", "timeText", "locationAddress", "banner", "tags"],
+    () => ["title", "description", "launchDateTime", "startDateTime", "endDateTime", "locationAddress", "banner", "tags"],
     []
   );
 
@@ -194,9 +218,9 @@ export default function EventCreateForm() {
       if (step === "details") {
         next.title = true;
         next.description = true;
-        next.startDate = true;
-        next.endDate = true;
-        next.timeText = true;
+        next.launchDateTime = true;
+        next.startDateTime = true;
+        next.endDateTime = true;
         next.locationAddress = true;
         next.banner = true;
         next.tags = true;
@@ -250,9 +274,9 @@ export default function EventCreateForm() {
       ...p,
       title: true,
       description: true,
-      startDate: true,
-      endDate: true,
-      timeText: true,
+      launchDateTime: true,
+      startDateTime: true,
+      endDateTime: true,
       locationAddress: true,
       banner: true,
       tags: true,
@@ -307,16 +331,52 @@ export default function EventCreateForm() {
       const form = new FormData();
       form.set("title", safeTrim(title));
       form.set("description", safeTrim(description));
-      form.set("startDate", startDate);
-      form.set("endDate", endDate);
-      form.set("timeText", safeTrim(timeText));
+      form.set("launchDateTime", launchDateTime);
+      form.set("startDateTime", startDateTime);
+      form.set("endDateTime", endDateTime);
       form.set("locationAddress", safeTrim(locationAddress));
+      form.set("locationName", safeTrim(locationName));
+      form.set("locationShow", locationShow ? "true" : "false");
+      form.set("locationRadiusKm", safeTrim(locationRadiusKm));
       if (locationPlaceId) form.set("locationPlaceId", locationPlaceId);
       if (typeof locationLat === "number") form.set("locationLat", String(locationLat));
       if (typeof locationLng === "number") form.set("locationLng", String(locationLng));
+
+      form.set("unlockQrAtVenue", unlockQrAtVenue ? "true" : "false");
+      form.set("groupsEnabled", groupsEnabled ? "true" : "false");
+      form.set("vehicleVerified", vehicleVerified ? "true" : "false");
       form.set("tags", JSON.stringify(tags));
       form.set("termsHtml", termsHtml);
       form.set("aboutHtml", aboutHtml);
+      form.set("thingsToKnow", thingsToKnow);
+      form.set("amenities", amenities);
+      form.set("buttonText", buttonText);
+      form.set(
+        "faqs",
+        JSON.stringify(
+          faqs
+            .map((f) => ({ question: safeTrim(f.question), answer: safeTrim(f.answer) }))
+            .filter((f) => f.question || f.answer)
+        )
+      );
+
+      const normalizedHosts = hosts
+        .map((h) => ({ name: safeTrim(h.name), show: Boolean(h.show), url: safeTrim(h.url), image: h.image }))
+        .filter((h) => h.name || h.url || h.image);
+      form.set(
+        "hosts",
+        JSON.stringify(
+          normalizedHosts.map((h) => ({
+            name: h.name,
+            show: h.show,
+            url: h.url,
+            hasImage: Boolean(h.image),
+          }))
+        )
+      );
+      for (const h of normalizedHosts) {
+        if (h.image) form.append("hostImages", h.image);
+      }
       form.set("organiserName", safeTrim(organiserName));
       form.set("status", status);
 
@@ -426,41 +486,66 @@ export default function EventCreateForm() {
           ) : null}
 
           {activeStep === "details" ? (
-            <EventBasicsSection
-              title={title}
-              description={description}
-              startDate={startDate}
-              endDate={endDate}
-              timeText={timeText}
-              locationAddress={locationAddress}
-              locationPlaceId={locationPlaceId}
-              locationLat={locationLat}
-              locationLng={locationLng}
-              banner={banner}
-              tags={tags}
-              touched={touched}
-              errors={errors}
-              onTitle={setTitle}
-              onDescription={setDescription}
-              onStartDate={setStartDate}
-              onEndDate={setEndDate}
-              onTimeText={setTimeText}
-              onLocationAddress={setLocationAddress}
-              onLocationPlaceId={setLocationPlaceId}
-              onLocationLat={setLocationLat}
-              onLocationLng={setLocationLng}
-              onBanner={setBanner}
-              onTags={setTags}
-              onTouched={setTouched}
-            />
+            <div className="grid gap-6">
+              <EventBasicsSection
+                title={title}
+                description={description}
+                launchDateTime={launchDateTime}
+                startDateTime={startDateTime}
+                endDateTime={endDateTime}
+                locationAddress={locationAddress}
+                locationName={locationName}
+                locationShow={locationShow}
+                locationRadiusKm={locationRadiusKm}
+                locationPlaceId={locationPlaceId}
+                locationLat={locationLat}
+                locationLng={locationLng}
+                banner={banner}
+                tags={tags}
+                touched={touched}
+                errors={errors}
+                onTitle={setTitle}
+                onDescription={setDescription}
+                onLaunchDateTime={setLaunchDateTime}
+                onStartDateTime={setStartDateTime}
+                onEndDateTime={setEndDateTime}
+                onLocationAddress={setLocationAddress}
+                onLocationName={setLocationName}
+                onLocationShow={setLocationShow}
+                onLocationRadiusKm={setLocationRadiusKm}
+                onLocationPlaceId={setLocationPlaceId}
+                onLocationLat={setLocationLat}
+                onLocationLng={setLocationLng}
+                onBanner={setBanner}
+                onTags={setTags}
+                onTouched={setTouched}
+              />
+
+              <EventSettingsSection
+                unlockQrAtVenue={unlockQrAtVenue}
+                groupsEnabled={groupsEnabled}
+                vehicleVerified={vehicleVerified}
+                onUnlockQrAtVenue={setUnlockQrAtVenue}
+                onGroupsEnabled={setGroupsEnabled}
+                onVehicleVerified={setVehicleVerified}
+              />
+            </div>
           ) : null}
 
           {activeStep === "content" ? (
             <EventContentSection
               termsHtml={termsHtml}
               aboutHtml={aboutHtml}
+              thingsToKnow={thingsToKnow}
+              amenities={amenities}
+              buttonText={buttonText}
+              faqs={faqs}
               onTerms={setTermsHtml}
               onAbout={setAboutHtml}
+              onThingsToKnow={setThingsToKnow}
+              onAmenities={setAmenities}
+              onButtonText={setButtonText}
+              onFaqs={setFaqs}
             />
           ) : null}
 
@@ -469,10 +554,12 @@ export default function EventCreateForm() {
               <EventOrganiserSection
                 organiserName={organiserName}
                 organiserLogo={organiserLogo}
+                hosts={hosts}
                 touched={touched}
                 errors={errors}
                 onName={setOrganiserName}
                 onLogo={setOrganiserLogo}
+                onHosts={setHosts}
                 onTouched={setTouched}
               />
 
