@@ -16,11 +16,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GEM Business",
   description: "Premium services, built mobile-first.",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#ffffff",
+  appleWebApp: {
+    capable: true,
+    title: "GEM Business",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

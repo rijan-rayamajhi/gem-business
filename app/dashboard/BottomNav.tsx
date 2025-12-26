@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   AddSquare,
   Calendar,
   Flash,
   Home2,
-  Speaker,
+  Microphone,
+  Shop,
   type IconProps,
 } from "iconsax-react";
 
@@ -29,8 +30,8 @@ type ActionNavItem = {
 type NavItem = LinkNavItem | ActionNavItem;
 
 const navItems: NavItem[] = [
-  { kind: "link", href: "/dashboard/catalogue", label: "Catalogue", icon: Home2 },
-  { kind: "link", href: "/dashboard/ads", label: "Ads", icon: Speaker },
+  { kind: "link", href: "/dashboard/catalogue", label: "Dashboard", icon: Home2 },
+  { kind: "link", href: "/dashboard/ads", label: "Ads", icon: Microphone },
   { kind: "action", key: "create", label: "", icon: AddSquare },
   { kind: "link", href: "/dashboard/event", label: "Event", icon: Calendar },
   { kind: "link", href: "/dashboard/flash-sale", label: "Flash Sale", icon: Flash },
@@ -44,15 +45,24 @@ function isActive(pathname: string, href: string) {
 export default function BottomNav() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const shouldHide =
     (pathname.startsWith("/dashboard/catalogue/") && pathname !== "/dashboard/catalogue") ||
     pathname.startsWith("/dashboard/boost-ads") ||
-    pathname.startsWith("/dashboard/event/create");
+    pathname.startsWith("/dashboard/event/create") ||
+    pathname.startsWith("/dashboard/business");
 
   useEffect(() => {
-    return;
-  }, []);
+    if (!createOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCreateOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [createOpen]);
 
   if (shouldHide) {
     return null;
@@ -60,6 +70,62 @@ export default function BottomNav() {
 
   return (
     <>
+      {createOpen ? (
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setCreateOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl"
+          >
+            <div className="rounded-t-3xl border border-zinc-200 bg-white px-4 pb-6 pt-3 shadow-2xl">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-zinc-200" />
+
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-zinc-900/10 bg-white px-4 py-3 text-left text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
+                  onClick={() => {
+                    setCreateOpen(false);
+                    router.push("/dashboard/catalogue/create");
+                  }}
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-zinc-950 text-white">
+                    <Home2 size={20} variant="Linear" color="#ffffff" aria-hidden="true" />
+                  </span>
+                  <span className="flex min-w-0 flex-col">
+                    <span>Add Catalogue</span>
+                    <span className="text-xs font-medium text-zinc-500">Create a new catalogue</span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-zinc-900/10 bg-white px-4 py-3 text-left text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50"
+                  onClick={() => {
+                    setCreateOpen(false);
+                    window.alert("Add Product: route not configured yet.");
+                  }}
+                >
+                  <span className="grid h-10 w-10 place-items-center rounded-2xl bg-zinc-950 text-white">
+                    <Shop size={20} variant="Linear" color="#ffffff" aria-hidden="true" />
+                  </span>
+                  <span className="flex min-w-0 flex-col">
+                    <span>Add Product</span>
+                    <span className="text-xs font-medium text-zinc-500">Create a new product</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <nav
         aria-label="Dashboard"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70"
@@ -74,7 +140,7 @@ export default function BottomNav() {
                   type="button"
                   aria-label="Create"
                   className="flex h-14 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-900"
-                  onClick={() => router.push("/dashboard/event/create")}
+                  onClick={() => setCreateOpen(true)}
                 >
                   <span className="h-1 w-8 rounded-full bg-transparent" />
                   <span className="grid place-items-center">

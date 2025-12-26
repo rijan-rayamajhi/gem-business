@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Calendar, Clock, Image, Location, NoteText, Tag, Text } from "iconsax-react";
+import { Calendar, Clock, Image, Location, NoteText, Tag, Text, Video } from "iconsax-react";
 
 type GoogleMapsApi = {
   maps?: {
@@ -16,6 +16,7 @@ type GoogleMapsApi = {
     ) => {
       setCenter: (center: { lat: number; lng: number }) => void;
       setZoom: (zoom: number) => void;
+      fitBounds: (bounds: unknown) => void;
     };
     Marker: new (opts: {
       position: { lat: number; lng: number };
@@ -25,6 +26,21 @@ type GoogleMapsApi = {
       setPosition: (center: { lat: number; lng: number }) => void;
       addListener: (eventName: string, handler: () => void) => unknown;
       getPosition: () => { lat: () => number; lng: () => number } | null;
+    };
+    Circle: new (opts: {
+      map: unknown;
+      center: { lat: number; lng: number };
+      radius: number;
+      strokeColor?: string;
+      strokeOpacity?: number;
+      strokeWeight?: number;
+      fillColor?: string;
+      fillOpacity?: number;
+    }) => {
+      setCenter: (center: { lat: number; lng: number }) => void;
+      setRadius: (radius: number) => void;
+      setMap: (map: unknown | null) => void;
+      getBounds: () => unknown | null;
     };
     Geocoder: new () => {
       geocode: (
@@ -95,13 +111,13 @@ type Props = {
   startDateTime: string;
   endDateTime: string;
   locationAddress: string;
-  locationName: string;
   locationShow: boolean;
   locationRadiusKm: string;
   locationPlaceId?: string;
   locationLat?: number;
   locationLng?: number;
   banner: File | null;
+  eventVideo: File | null;
   tags: string[];
   touched: Record<string, boolean>;
   errors: Record<string, string>;
@@ -111,13 +127,13 @@ type Props = {
   onStartDateTime: (v: string) => void;
   onEndDateTime: (v: string) => void;
   onLocationAddress: (v: string) => void;
-  onLocationName: (v: string) => void;
   onLocationShow: (v: boolean) => void;
   onLocationRadiusKm: (v: string) => void;
   onLocationPlaceId: (v: string | undefined) => void;
   onLocationLat: (v: number | undefined) => void;
   onLocationLng: (v: number | undefined) => void;
   onBanner: (v: File | null) => void;
+  onEventVideo: (file: File | null, error: string) => void;
   onTags: (v: string[]) => void;
   onTouched: (v: (prev: Record<string, boolean>) => Record<string, boolean>) => void;
 };
@@ -134,13 +150,13 @@ export default function EventBasicsSection(props: Props) {
     startDateTime,
     endDateTime,
     locationAddress,
-    locationName,
     locationShow,
     locationRadiusKm,
     locationPlaceId,
     locationLat,
     locationLng,
     banner,
+    eventVideo,
     tags,
     touched,
     errors,
@@ -150,40 +166,107 @@ export default function EventBasicsSection(props: Props) {
     onStartDateTime,
     onEndDateTime,
     onLocationAddress,
-    onLocationName,
     onLocationShow,
     onLocationRadiusKm,
     onLocationPlaceId,
     onLocationLat,
     onLocationLng,
     onBanner,
+    onEventVideo,
     onTags,
     onTouched,
   } = props;
 
   const bannerInputId = useId();
+  const videoInputId = useId();
   const [tagDraft, setTagDraft] = useState("");
   const [geoStatus, setGeoStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "unavailable">("idle");
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const mapElRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<{ setCenter: (center: { lat: number; lng: number }) => void; setZoom: (zoom: number) => void } | null>(null);
+  const mapInstanceRef = useRef<{
+    setCenter: (center: { lat: number; lng: number }) => void;
+    setZoom: (zoom: number) => void;
+    fitBounds: (bounds: unknown) => void;
+  } | null>(null);
   const markerRef = useRef<{
     setPosition: (center: { lat: number; lng: number }) => void;
     addListener: (eventName: string, handler: () => void) => unknown;
     getPosition: () => { lat: () => number; lng: () => number } | null;
   } | null>(null);
   const markerDragListenerRef = useRef<unknown | null>(null);
+  const circleRef = useRef<{
+    setCenter: (center: { lat: number; lng: number }) => void;
+    setRadius: (radius: number) => void;
+    setMap: (map: unknown | null) => void;
+    getBounds: () => unknown | null;
+  } | null>(null);
 
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const googleStatus = useGoogleMapsScript(googleMapsApiKey);
 
   const bannerPreview = useMemo(() => (banner ? URL.createObjectURL(banner) : ""), [banner]);
+  const videoPreview = useMemo(() => (eventVideo ? URL.createObjectURL(eventVideo) : ""), [eventVideo]);
 
   useEffect(() => {
     return () => {
       if (bannerPreview) URL.revokeObjectURL(bannerPreview);
     };
   }, [bannerPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (videoPreview) URL.revokeObjectURL(videoPreview);
+    };
+  }, [videoPreview]);
+
+  async function validateAndSetVideo(file: File | null) {
+    if (!file) {
+      onEventVideo(null, "");
+      return;
+    }
+
+    if (!file.type.startsWith("video/")) {
+      onEventVideo(null, "Event video must be a video.");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const duration = await new Promise<number>((resolve, reject) => {
+        const el = document.createElement("video");
+        el.preload = "metadata";
+        el.src = objectUrl;
+        const cleanup = () => {
+          el.onloadedmetadata = null;
+          el.onerror = null;
+        };
+        el.onloadedmetadata = () => {
+          cleanup();
+          resolve(el.duration);
+        };
+        el.onerror = () => {
+          cleanup();
+          reject(new Error("Failed to read video metadata"));
+        };
+      });
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        onEventVideo(null, "Unable to read video duration.");
+        return;
+      }
+
+      if (duration > 10) {
+        onEventVideo(null, "Video must be 10 seconds or less.");
+        return;
+      }
+
+      onEventVideo(file, "");
+    } catch {
+      onEventVideo(null, "Unable to read video duration.");
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
 
   function requestCurrentLocation() {
     if (!navigator.geolocation) {
@@ -307,6 +390,60 @@ export default function EventBasicsSection(props: Props) {
     };
   }, [googleStatus, locationLat, locationLng, onLocationAddress, onLocationLat, onLocationLng, onLocationPlaceId, onTouched]);
 
+  const radiusMeters = useMemo(() => {
+    const raw = safeTrim(locationRadiusKm);
+    if (!raw) return null;
+    const km = Number(raw);
+    if (!Number.isFinite(km) || km <= 0) return null;
+    return km * 1000;
+  }, [locationRadiusKm]);
+
+  useEffect(() => {
+    if (googleStatus !== "ready") return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const googleAny = (window as unknown as { google?: GoogleMapsApi }).google;
+    const maps = googleAny?.maps;
+    if (!maps?.Circle) return;
+    if (typeof locationLat !== "number" || typeof locationLng !== "number") return;
+
+    const center = { lat: locationLat, lng: locationLng };
+
+    if (radiusMeters === null) {
+      if (circleRef.current) {
+        circleRef.current.setMap(null);
+        circleRef.current = null;
+      }
+      return;
+    }
+
+    if (!circleRef.current) {
+      circleRef.current = new maps.Circle({
+        map,
+        center,
+        radius: radiusMeters,
+        strokeColor: "#09090b",
+        strokeOpacity: 0.25,
+        strokeWeight: 2,
+        fillColor: "#09090b",
+        fillOpacity: 0.08,
+      });
+    } else {
+      circleRef.current.setCenter(center);
+      circleRef.current.setRadius(radiusMeters);
+      circleRef.current.setMap(map);
+    }
+
+    const bounds = circleRef.current.getBounds();
+    if (bounds) {
+      try {
+        map.fitBounds(bounds);
+      } catch {
+        // ignore
+      }
+    }
+  }, [googleStatus, locationLat, locationLng, radiusMeters]);
+
   function addTag(raw: string) {
     const tag = safeTrim(raw).replace(/,+$/, "");
     if (!tag) return;
@@ -344,6 +481,44 @@ export default function EventBasicsSection(props: Props) {
           </div>
           {touched.title && errors.title ? (
             <div className="text-xs text-rose-600">{errors.title}</div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor={videoInputId}>
+            Event video (max 10s) - optional
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="relative inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-50">
+              <Video size={18} variant="Linear" color="#09090b" aria-hidden="true" />
+              Upload video
+              <input
+                id={videoInputId}
+                type="file"
+                accept="video/*"
+                className="absolute h-px w-px opacity-0"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  onTouched((p) => ({ ...p, eventVideo: true }));
+                  void validateAndSetVideo(file);
+                  e.currentTarget.value = "";
+                }}
+                onBlur={() => onTouched((p) => ({ ...p, eventVideo: true }))}
+              />
+            </label>
+            <div className="text-xs text-zinc-500">Optional</div>
+          </div>
+
+          {touched.eventVideo && errors.eventVideo ? (
+            <div className="text-xs text-rose-600">{errors.eventVideo}</div>
+          ) : null}
+
+          {videoPreview ? (
+            <div className="overflow-hidden rounded-2xl border border-zinc-900/10 bg-white shadow-sm">
+              <div className="relative aspect-[16/9] w-full bg-zinc-100">
+                <video src={videoPreview} className="h-full w-full object-cover" controls playsInline />
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -515,21 +690,7 @@ export default function EventBasicsSection(props: Props) {
             </div>
           ) : null}
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="eventLocationName">
-                Location Name
-              </label>
-              <input
-                id="eventLocationName"
-                className="h-10 w-full rounded-xl border border-zinc-900/10 bg-white px-3 text-sm shadow-sm outline-none transition focus:border-zinc-900/20 focus:bg-zinc-50"
-                value={locationName}
-                onChange={(e) => onLocationName(e.target.value)}
-                onBlur={() => onTouched((p) => ({ ...p, locationName: true }))}
-                placeholder="Optional"
-              />
-            </div>
-
+          <div className="mt-4 grid gap-3">
             <div className="grid gap-2">
               <label className="text-sm font-medium" htmlFor="eventLocationRadius">
                 Radius (km)
@@ -541,19 +702,40 @@ export default function EventBasicsSection(props: Props) {
                 value={locationRadiusKm}
                 onChange={(e) => onLocationRadiusKm(e.target.value)}
                 onBlur={() => onTouched((p) => ({ ...p, locationRadiusKm: true }))}
-                placeholder="Optional"
+                placeholder="Required"
+                required
               />
+              {touched.locationRadiusKm && errors.locationRadiusKm ? (
+                <div className="text-xs text-rose-600">{errors.locationRadiusKm}</div>
+              ) : null}
             </div>
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-900/10 bg-white px-3 py-2 shadow-sm">
-            <div className="text-sm font-medium">Show/Hide</div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Show/Hide</div>
+              <div className="mt-0.5 text-xs font-medium text-zinc-500">
+                Controls whether this event location & radius is visible to users.
+              </div>
+            </div>
             <button
               type="button"
-              className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-3 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+              role="switch"
+              aria-checked={locationShow}
+              className={
+                "relative inline-flex h-7 w-12 items-center rounded-full border transition " +
+                (locationShow
+                  ? "border-zinc-950 bg-zinc-950"
+                  : "border-zinc-900/10 bg-zinc-200")
+              }
               onClick={() => onLocationShow(!locationShow)}
             >
-              {locationShow ? "Show" : "Hide"}
+              <span
+                className={
+                  "inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition " +
+                  (locationShow ? "translate-x-5" : "translate-x-1")
+                }
+              />
             </button>
           </div>
         </div>

@@ -79,6 +79,28 @@ async function uploadImageToStorage(params: { uid: string; file: File; folder: s
   return { objectPath, publicUrl };
 }
 
+async function uploadFileToStorage(params: { uid: string; file: File; folder: string }) {
+  const { uid, file, folder } = params;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const safeName = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  const objectPath = `${folder}/${uid}/${Date.now()}_${safeName}`;
+
+  const objectRef = adminStorageBucket.file(objectPath);
+  await objectRef.save(buffer, {
+    resumable: false,
+    metadata: {
+      contentType: file.type || "application/octet-stream",
+      cacheControl: "public, max-age=31536000",
+    },
+  });
+
+  await objectRef.makePublic();
+  const publicUrl = objectRef.publicUrl();
+
+  return { objectPath, publicUrl };
+}
+
 type TicketInput = {
   title: string;
   description: string;
@@ -171,7 +193,6 @@ export async function POST(request: Request) {
   const startDateTime = String(form.get("startDateTime") ?? "").trim();
   const endDateTime = String(form.get("endDateTime") ?? "").trim();
   const locationAddress = String(form.get("locationAddress") ?? "").trim();
-  const locationName = String(form.get("locationName") ?? "").trim();
   const locationShowRaw = String(form.get("locationShow") ?? "true").trim().toLowerCase();
   const locationShow = locationShowRaw !== "false";
   const locationRadiusKmRaw = String(form.get("locationRadiusKm") ?? "").trim();
@@ -201,9 +222,12 @@ export async function POST(request: Request) {
   const status: EventStatus = asEventStatus(statusRaw) ?? "draft";
 
   const banner = form.get("banner");
+  const eventVideo = form.get("eventVideo");
   if (!(banner instanceof File)) {
     return NextResponse.json({ ok: false, message: "Event banner is required." }, { status: 400 });
   }
+
+  const videoFile = eventVideo instanceof File ? eventVideo : null;
 
   if (!title) {
     return NextResponse.json({ ok: false, message: "Event title is required." }, { status: 400 });
@@ -234,6 +258,27 @@ export async function POST(request: Request) {
 
   if (!locationAddress) {
     return NextResponse.json({ ok: false, message: "Event location is required." }, { status: 400 });
+  }
+
+  const locationRadiusKmParsed = locationRadiusKmRaw ? Number(locationRadiusKmRaw) : NaN;
+  if (!Number.isFinite(locationRadiusKmParsed) || locationRadiusKmParsed <= 0) {
+    return NextResponse.json({ ok: false, message: "Radius is required." }, { status: 400 });
+  }
+
+  if (videoFile) {
+    const maxVideoBytes = 25 * 1024 * 1024;
+    if (videoFile.size > maxVideoBytes) {
+      return NextResponse.json(
+        { ok: false, message: "Event video must be under 25MB." },
+        { status: 400 }
+      );
+    }
+    if (!videoFile.type.startsWith("video/")) {
+      return NextResponse.json(
+        { ok: false, message: "Event video must be a video." },
+        { status: 400 }
+      );
+    }
   }
 
   if (!organiserName) {
@@ -333,6 +378,10 @@ export async function POST(request: Request) {
   try {
     const bannerUpload = await uploadImageToStorage({ uid, file: banner, folder: "eventBanners" });
 
+    const videoUrl = videoFile
+      ? (await uploadFileToStorage({ uid, file: videoFile, folder: "eventVideos" })).publicUrl
+      : "";
+
     const organiserLogoUrl =
       organiserLogo instanceof File
         ? (
@@ -395,7 +444,7 @@ export async function POST(request: Request) {
 
     const locationLat = locationLatRaw ? Number(locationLatRaw) : NaN;
     const locationLng = locationLngRaw ? Number(locationLngRaw) : NaN;
-    const locationRadiusKm = locationRadiusKmRaw ? Number(locationRadiusKmRaw) : NaN;
+    const locationRadiusKm = locationRadiusKmParsed;
 
     const docRef = await adminDb.collection("events").add({
       userId: uid,
@@ -408,14 +457,14 @@ export async function POST(request: Request) {
       endDate: endDateTime,
       location: {
         address: locationAddress,
-        ...(locationName ? { name: locationName } : {}),
         ...(locationShow === false ? { show: false } : {}),
-        ...(Number.isFinite(locationRadiusKm) ? { radiusKm: locationRadiusKm } : {}),
+        radiusKm: locationRadiusKm,
         ...(locationPlaceId ? { placeId: locationPlaceId } : {}),
         ...(Number.isFinite(locationLat) ? { lat: locationLat } : {}),
         ...(Number.isFinite(locationLng) ? { lng: locationLng } : {}),
       },
       bannerUrl: bannerUpload.publicUrl,
+      ...(videoUrl ? { videoUrl } : {}),
       tags,
       ...(termsHtml ? { termsHtml } : {}),
       ...(aboutHtml ? { aboutHtml } : {}),

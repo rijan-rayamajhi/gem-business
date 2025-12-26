@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   const uid = auth.uid;
 
   const businessSnap = await adminDb.collection("business").doc(uid).get();
+  const businessData = businessSnap.exists ? (businessSnap.data() ?? {}) : null;
   const statusRaw = businessSnap.exists ? (businessSnap.data()?.status as unknown) : null;
   const businessStatus: BusinessStatus | null = isBusinessStatus(statusRaw)
     ? statusRaw
@@ -35,8 +36,13 @@ export async function GET(request: Request) {
     businessStatus === "pending" ||
     businessStatus === "verified";
 
+  const businessName =
+    businessData && typeof businessData.businessName === "string" ? businessData.businessName : "";
+  const businessLogoUrl =
+    businessData && typeof businessData.businessLogoUrl === "string" ? businessData.businessLogoUrl : "";
+
   return NextResponse.json(
-    { ok: true, uid, hasBusiness, businessStatus },
+    { ok: true, uid, hasBusiness, businessStatus, businessName, businessLogoUrl },
     { status: 200 }
   );
 }

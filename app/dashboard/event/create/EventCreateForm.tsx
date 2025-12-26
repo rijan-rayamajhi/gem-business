@@ -74,7 +74,6 @@ export default function EventCreateForm() {
   const [startDateTime, setStartDateTime] = useState("");
   const [endDateTime, setEndDateTime] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
-  const [locationName, setLocationName] = useState("");
   const [locationShow, setLocationShow] = useState(true);
   const [locationRadiusKm, setLocationRadiusKm] = useState("");
   const [locationPlaceId, setLocationPlaceId] = useState<string | undefined>(undefined);
@@ -82,6 +81,8 @@ export default function EventCreateForm() {
   const [locationLng, setLocationLng] = useState<number | undefined>(undefined);
 
   const [banner, setBanner] = useState<File | null>(null);
+  const [eventVideo, setEventVideo] = useState<File | null>(null);
+  const [eventVideoError, setEventVideoError] = useState<string>("");
   const [tags, setTags] = useState<string[]>([]);
 
   const [unlockQrAtVenue, setUnlockQrAtVenue] = useState(false);
@@ -90,8 +91,8 @@ export default function EventCreateForm() {
 
   const [termsHtml, setTermsHtml] = useState("<p></p>");
   const [aboutHtml, setAboutHtml] = useState("<p></p>");
-  const [thingsToKnow, setThingsToKnow] = useState("");
-  const [amenities, setAmenities] = useState("");
+  const [thingsToKnow, setThingsToKnow] = useState("<p></p>");
+  const [amenities, setAmenities] = useState("<p></p>");
   const [buttonText, setButtonText] = useState("");
   const [faqs, setFaqs] = useState<FaqDraft[]>([{ question: "", answer: "" }]);
 
@@ -129,9 +130,21 @@ export default function EventCreateForm() {
       }
     }
     if (!safeTrim(locationAddress)) next.locationAddress = "Event location is required.";
+    if (!safeTrim(locationRadiusKm)) next.locationRadiusKm = "Radius is required.";
+    else {
+      const km = parseNumberOrNull(locationRadiusKm);
+      if (km === null || km <= 0) next.locationRadiusKm = "Radius must be greater than 0.";
+    }
 
     if (!banner) next.banner = "Event banner is required.";
     else if (!banner.type.startsWith("image/")) next.banner = "Event banner must be an image.";
+
+    if (eventVideo && !eventVideo.type.startsWith("video/")) {
+      next.eventVideo = "Event video must be a video.";
+    }
+    if (eventVideoError) {
+      next.eventVideo = eventVideoError;
+    }
 
     if (tags.length < 1) next.tags = "Add at least 1 tag (max 5).";
 
@@ -173,12 +186,23 @@ export default function EventCreateForm() {
     }
 
     return next;
-  }, [aboutHtml, amenities, banner, buttonText, description, endDateTime, gallery, launchDateTime, locationAddress, locationName, locationRadiusKm, organiserLogo, organiserName, partners, sponsors, startDateTime, tags.length, tickets, thingsToKnow, title, termsHtml]);
+  }, [aboutHtml, amenities, banner, buttonText, description, endDateTime, eventVideo, eventVideoError, gallery, launchDateTime, locationAddress, locationRadiusKm, organiserLogo, organiserName, partners, sponsors, startDateTime, tags.length, tickets, thingsToKnow, title, termsHtml]);
 
   const canSubmit = Object.keys(errors).length === 0;
 
   const detailsErrorKeys = useMemo(
-    () => ["title", "description", "launchDateTime", "startDateTime", "endDateTime", "locationAddress", "banner", "tags"],
+    () => [
+      "title",
+      "description",
+      "launchDateTime",
+      "startDateTime",
+      "endDateTime",
+      "locationAddress",
+      "locationRadiusKm",
+      "banner",
+      "eventVideo",
+      "tags",
+    ],
     []
   );
 
@@ -222,7 +246,9 @@ export default function EventCreateForm() {
         next.startDateTime = true;
         next.endDateTime = true;
         next.locationAddress = true;
+        next.locationRadiusKm = true;
         next.banner = true;
+        next.eventVideo = true;
         next.tags = true;
       }
 
@@ -335,7 +361,6 @@ export default function EventCreateForm() {
       form.set("startDateTime", startDateTime);
       form.set("endDateTime", endDateTime);
       form.set("locationAddress", safeTrim(locationAddress));
-      form.set("locationName", safeTrim(locationName));
       form.set("locationShow", locationShow ? "true" : "false");
       form.set("locationRadiusKm", safeTrim(locationRadiusKm));
       if (locationPlaceId) form.set("locationPlaceId", locationPlaceId);
@@ -381,6 +406,7 @@ export default function EventCreateForm() {
       form.set("status", status);
 
       form.set("banner", banner);
+      if (eventVideo) form.set("eventVideo", eventVideo);
       if (organiserLogo) form.set("organiserLogo", organiserLogo);
 
       form.set("sponsorNames", JSON.stringify(sponsors.map((s) => safeTrim(s.name))));
@@ -494,13 +520,13 @@ export default function EventCreateForm() {
                 startDateTime={startDateTime}
                 endDateTime={endDateTime}
                 locationAddress={locationAddress}
-                locationName={locationName}
                 locationShow={locationShow}
                 locationRadiusKm={locationRadiusKm}
                 locationPlaceId={locationPlaceId}
                 locationLat={locationLat}
                 locationLng={locationLng}
                 banner={banner}
+                eventVideo={eventVideo}
                 tags={tags}
                 touched={touched}
                 errors={errors}
@@ -510,13 +536,16 @@ export default function EventCreateForm() {
                 onStartDateTime={setStartDateTime}
                 onEndDateTime={setEndDateTime}
                 onLocationAddress={setLocationAddress}
-                onLocationName={setLocationName}
                 onLocationShow={setLocationShow}
                 onLocationRadiusKm={setLocationRadiusKm}
                 onLocationPlaceId={setLocationPlaceId}
                 onLocationLat={setLocationLat}
                 onLocationLng={setLocationLng}
                 onBanner={setBanner}
+                onEventVideo={(file: File | null, error: string) => {
+                  setEventVideo(file);
+                  setEventVideoError(error);
+                }}
                 onTags={setTags}
                 onTouched={setTouched}
               />

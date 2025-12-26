@@ -2,6 +2,7 @@
 
 import RichTextEditor from "@/components/RichTextEditor";
 import { useRouter } from "next/navigation";
+import { CloseCircle } from "iconsax-react";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 
 type FieldErrors = {
@@ -158,22 +159,37 @@ export default function CatalogueCreatePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        <div className="grid gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Create Catalogue</h1>
-          <p className="text-sm text-zinc-600">
-            Add images, details, and an offer description for your catalogue.
-          </p>
-        </div>
+      <div className="border-b border-zinc-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6">
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              aria-label="Close"
+              className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-900/10 bg-white text-lg font-semibold leading-none text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+              onClick={() => router.push("/dashboard/catalogue")}
+            >
+              <CloseCircle size={20} variant="Linear" color="#09090b" aria-hidden="true" />
+            </button>
 
-        <form className="mt-8 grid gap-6" onSubmit={onSubmit}>
+            <div className="grid gap-1">
+              <div className="text-lg font-semibold tracking-tight">Create Catalogue</div>
+              <div className="text-sm text-zinc-600">
+                Add images, details, and an offer description for your catalogue.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+        <form className="grid gap-6" onSubmit={onSubmit}>
           {submitError ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
               {submitError}
             </div>
           ) : null}
           {submitSuccess ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-sm">
               {submitSuccess}
             </div>
           ) : null}
@@ -285,14 +301,16 @@ export default function CatalogueCreatePage() {
             <div className="text-xs text-zinc-500">Tip: highlight text then use toolbar.</div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <button
-              type="submit"
-              className="inline-flex h-12 items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!canSubmit || isSubmitting}
-            >
-              {isSubmitting ? "Creating..." : "Create Catalogue"}
-            </button>
+          <div className="mt-2 border-t border-zinc-200 pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="submit"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                disabled={!canSubmit || isSubmitting}
+              >
+                {isSubmitting ? "Creating..." : "Create Catalogue"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

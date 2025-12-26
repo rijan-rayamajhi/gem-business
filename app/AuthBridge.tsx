@@ -9,6 +9,36 @@ type GemAuthMessage = {
 
 export default function AuthBridge() {
   useEffect(() => {
+    const canRegisterSw =
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      window.isSecureContext &&
+      process.env.NODE_ENV === "production";
+
+    if (canRegisterSw) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          registration.update().catch(() => null);
+
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
+
+          registration.addEventListener("updatefound", () => {
+            const installing = registration.installing;
+            if (!installing) return;
+
+            installing.addEventListener("statechange", () => {
+              if (installing.state !== "installed") return;
+              if (!navigator.serviceWorker.controller) return;
+              window.location.reload();
+            });
+          });
+        })
+        .catch(() => null);
+    }
+
     const isDevBypassEnabled =
       process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "1";
 

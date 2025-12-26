@@ -11,20 +11,36 @@ type Props = {
 
 function ToggleRow(props: {
   label: string;
+  hint: string;
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const { label, value, onChange } = props;
+  const { label, hint, value, onChange } = props;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-900/10 bg-zinc-50 p-4">
-      <div className="text-sm font-semibold text-zinc-900">{label}</div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-zinc-900">{label}</div>
+        <div className="mt-0.5 text-xs font-medium text-zinc-500">{hint}</div>
+      </div>
       <button
         type="button"
-        className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-900/10 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+        role="switch"
+        aria-checked={value}
+        className={
+          "relative inline-flex h-7 w-12 items-center rounded-full border transition " +
+          (value
+            ? "border-zinc-950 bg-zinc-950"
+            : "border-zinc-900/10 bg-zinc-200")
+        }
         onClick={() => onChange(!value)}
       >
-        {value ? "True" : "False"}
+        <span
+          className={
+            "inline-block h-6 w-6 transform rounded-full bg-white shadow-sm transition " +
+            (value ? "translate-x-5" : "translate-x-1")
+          }
+        />
       </button>
     </div>
   );
@@ -48,9 +64,24 @@ export default function EventSettingsSection(props: Props) {
       </div>
 
       <div className="grid gap-4 px-6 py-6">
-        <ToggleRow label="UnLock QR code at Venue" value={unlockQrAtVenue} onChange={onUnlockQrAtVenue} />
-        <ToggleRow label="Groups" value={groupsEnabled} onChange={onGroupsEnabled} />
-        <ToggleRow label="Vehicle Verified" value={vehicleVerified} onChange={onVehicleVerified} />
+        <ToggleRow
+          label="UnLock QR code at Venue"
+          hint="User can only see QR code in venue"
+          value={unlockQrAtVenue}
+          onChange={onUnlockQrAtVenue}
+        />
+        <ToggleRow
+          label="Groups"
+          hint="Allows user to select groups"
+          value={groupsEnabled}
+          onChange={onGroupsEnabled}
+        />
+        <ToggleRow
+          label="Vehicle Verified"
+          hint="Only verified vehicle user registration"
+          value={vehicleVerified}
+          onChange={onVehicleVerified}
+        />
       </div>
     </div>
   );

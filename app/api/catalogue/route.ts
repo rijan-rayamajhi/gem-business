@@ -12,6 +12,92 @@ function asCatalogueStatus(value: unknown): CatalogueStatus | null {
     : null;
 }
 
+ function asNonEmptyString(value: unknown) {
+   return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
+ }
+
+ function dateToMs(value: unknown): number | null {
+   if (!value) return null;
+
+   if (value instanceof Date) {
+     const ms = value.getTime();
+     return Number.isFinite(ms) ? ms : null;
+   }
+
+   if (typeof value === "string") {
+     const ms = new Date(value).getTime();
+     return Number.isFinite(ms) ? ms : null;
+   }
+
+   if (typeof value === "number") {
+     return Number.isFinite(value) ? value : null;
+   }
+
+   if (typeof value === "object") {
+     const obj = value as Record<string, unknown>;
+
+     const maybeToDate = obj && (obj as { toDate?: unknown }).toDate;
+     if (typeof maybeToDate === "function") {
+       try {
+         const d = (maybeToDate as () => Date)();
+         const ms = d.getTime();
+         return Number.isFinite(ms) ? ms : null;
+       } catch {
+         return null;
+       }
+     }
+
+     const seconds = typeof obj.seconds === "number" ? obj.seconds : NaN;
+     const nanos = typeof obj.nanoseconds === "number" ? obj.nanoseconds : NaN;
+     if (Number.isFinite(seconds)) {
+       const ms = seconds * 1000 + (Number.isFinite(nanos) ? Math.floor(nanos / 1e6) : 0);
+       return Number.isFinite(ms) ? ms : null;
+     }
+   }
+
+   return null;
+ }
+
+ function pickActiveFlashSale(
+   docs: Array<{ id: string; data: Record<string, unknown> }>
+ ): { id: string; data: Record<string, unknown> } | null {
+   const now = Date.now();
+
+   const candidates = docs.filter((d) => {
+     const status = asNonEmptyString(d.data.status).toLowerCase();
+     if (status !== "active") return false;
+
+     const campaign =
+       d.data.campaign && typeof d.data.campaign === "object"
+         ? (d.data.campaign as Record<string, unknown>)
+         : null;
+     const startsAtMs = dateToMs(campaign?.startsAt);
+     const endsAtMs = dateToMs(campaign?.endsAt);
+
+     if (startsAtMs === null || endsAtMs === null) return false;
+     return now >= startsAtMs && now <= endsAtMs;
+   });
+
+   if (!candidates.length) return null;
+
+   candidates.sort((a, b) => {
+     const aCampaign =
+       a.data.campaign && typeof a.data.campaign === "object"
+         ? (a.data.campaign as Record<string, unknown>)
+         : null;
+     const bCampaign =
+       b.data.campaign && typeof b.data.campaign === "object"
+         ? (b.data.campaign as Record<string, unknown>)
+         : null;
+
+     const aStart = dateToMs(aCampaign?.startsAt) ?? 0;
+     const bStart = dateToMs(bCampaign?.startsAt) ?? 0;
+     return bStart - aStart;
+   });
+
+   return candidates[0] ?? null;
+ }
+
 async function uploadImageToStorage(params: {
   uid: string;
   file: File;
@@ -78,6 +164,35 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
 
   const uid = auth.uid;
+
+  try {
+    const flashSnap = await adminDb.collection("flashSale").get();
+    const flashDocs = flashSnap.docs.map((d) => ({
+      id: d.id,
+      data: (d.data() ?? {}) as Record<string, unknown>,
+    }));
+
+    const active = pickActiveFlashSale(flashDocs);
+    if (active) {
+      const businessObj =
+        active.data.business && typeof active.data.business === "object"
+          ? (active.data.business as Record<string, unknown>)
+          : null;
+
+      const cutoffAtMs =
+        dateToMs(businessObj?.cutoffAt) ??
+        dateToMs(active.data.cutoffAt);
+
+      if (cutoffAtMs !== null && Date.now() > cutoffAtMs) {
+        return NextResponse.json(
+          { ok: false, message: "Catalogue cannot be added after the flash sale cutoff." },
+          { status: 403 }
+        );
+      }
+    }
+  } catch (err) {
+    console.error("/api/catalogue POST flash sale cutoff check failed", err);
+  }
 
   let form: FormData;
   try {

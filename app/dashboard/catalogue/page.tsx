@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AddSquare, Home2 } from "iconsax-react";
+import { AddSquare, Home2, Notification, ProfileCircle } from "iconsax-react";
+
+type MeResponse = {
+  ok?: boolean;
+  businessName?: unknown;
+  businessLogoUrl?: unknown;
+};
 
 type CatalogueStatus = "draft" | "pending" | "rejected" | "verified";
 
@@ -137,6 +143,9 @@ function badgeClass(status: CatalogueStatus) {
 export default function DashboardCataloguePage() {
   const router = useRouter();
   const [items, setItems] = useState<CatalogueItem[]>([]);
+  const [businessName, setBusinessName] = useState<string>("Business");
+  const [businessLogoUrl, setBusinessLogoUrl] = useState<string>("");
+  const [showOnHome, setShowOnHome] = useState(false);
   const [loadState, setLoadState] = useState<
     | { status: "idle" }
     | { status: "loading" }
@@ -161,12 +170,47 @@ export default function DashboardCataloguePage() {
     setTokenCheck({ status: "ready", token });
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("gem_show_on_home");
+      if (stored === "1") setShowOnHome(true);
+      if (stored === "0") setShowOnHome(false);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const showMissingToken = tokenCheck.status === "ready" && !tokenCheck.token;
 
   useEffect(() => {
     if (tokenCheck.status !== "ready") return;
     const token = tokenCheck.token;
     if (!token) return;
+
+    const meController = new AbortController();
+    const loadMe = async () => {
+      try {
+        const res = await fetch("/api/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          signal: meController.signal,
+        });
+        if (!res.ok) return;
+
+        const data = (await res.json().catch(() => null)) as MeResponse | null;
+        if (!data || data.ok !== true) return;
+
+        const name = typeof data.businessName === "string" ? data.businessName.trim() : "";
+        setBusinessName(name || "Business");
+
+        const logoUrl =
+          typeof data.businessLogoUrl === "string" ? data.businessLogoUrl.trim() : "";
+        setBusinessLogoUrl(logoUrl);
+      } catch {
+        // ignore
+      }
+    };
+    void loadMe();
 
     const controller = new AbortController();
     const run = async () => {
@@ -222,7 +266,10 @@ export default function DashboardCataloguePage() {
     };
 
     void run();
-    return () => controller.abort();
+    return () => {
+      meController.abort();
+      controller.abort();
+    };
   }, [filter, tokenCheck]);
 
   const filteredItems = useMemo(() => {
@@ -235,23 +282,83 @@ export default function DashboardCataloguePage() {
   const showEmptyFiltered = loadState.status === "idle" && items.length > 0 && filteredItems.length === 0;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Catalogue</h1>
-          <p className="mt-1 text-sm text-zinc-600">Your created catalogues.</p>
-        </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-3 rounded-2xl border border-zinc-900/10 bg-white px-3 py-2 shadow-sm transition hover:bg-zinc-50"
+          onClick={() => router.push("/dashboard/business")}
+        >
+          <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-zinc-950 text-white">
+            {businessLogoUrl ? (
+              <img
+                src={businessLogoUrl}
+                alt={businessName}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <ProfileCircle size={20} variant="Linear" color="#ffffff" aria-hidden="true" />
+            )}
+          </span>
+          <span className="min-w-0 text-left">
+            <div className="text-sm font-semibold text-zinc-950">{businessName}</div>
+            <div className="text-xs font-medium text-zinc-500">Business</div>
+          </span>
+        </button>
 
-        {hasItems ? (
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-900"
-            onClick={() => router.push("/catalogue/create")}
+            aria-label="Notifications"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-zinc-900/10 bg-white text-zinc-950 shadow-sm transition hover:bg-zinc-50"
+            onClick={() => window.alert("Notifications: coming soon.")}
           >
-            <AddSquare size={18} variant="Linear" color="#ffffff" aria-hidden="true" />
-            Add Catalogue
+            <Notification size={20} variant="Linear" color="#09090b" aria-hidden="true" />
           </button>
-        ) : null}
+
+          <label className="flex items-center gap-2 rounded-2xl border border-zinc-900/10 bg-white px-3 py-2 text-sm font-semibold text-zinc-950 shadow-sm">
+            <span className="text-xs font-semibold text-zinc-700">Show on home</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showOnHome}
+              className={
+                "relative inline-flex h-6 w-11 items-center rounded-full border transition " +
+                (showOnHome
+                  ? "border-zinc-950 bg-zinc-950"
+                  : "border-zinc-900/10 bg-zinc-200")
+              }
+              onClick={() => {
+                setShowOnHome((prev) => {
+                  const next = !prev;
+                  try {
+                    localStorage.setItem("gem_show_on_home", next ? "1" : "0");
+                  } catch {
+                    // ignore
+                  }
+                  return next;
+                });
+              }}
+            >
+              <span
+                className={
+                  "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition " +
+                  (showOnHome ? "translate-x-5" : "translate-x-1")
+                }
+              />
+            </button>
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-zinc-600">Manage your catalogue.</p>
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="text-sm font-medium text-zinc-700">Filter</div>
